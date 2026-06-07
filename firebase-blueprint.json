@@ -1,0 +1,98 @@
+{
+  "entities": {
+    "Ticket": {
+      "title": "Support Ticket",
+      "description": "Represents an active or resolved vernacular customer support ticket",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "customerName": { "type": "string" },
+        "phoneNumber": { "type": "string" },
+        "status": { "type": "string", "enum": ["AI_PENDING", "RESOLVED", "ESCALATED"] },
+        "detectedLanguage": { "type": "string" },
+        "lastIntent": { "type": "string" },
+        "sentiment": { "type": "string", "enum": ["Positive", "Neutral", "Negative", "Angry"] },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" },
+        "humanRequested": { "type": "boolean" },
+        "escalationDismissed": { "type": "boolean" },
+        "slaExpiresAt": { "type": "string", "format": "date-time" },
+        "assignedToId": { "type": "string" },
+        "assignedToName": { "type": "string" },
+        "rating": { "type": "integer" },
+        "ratingFeedback": { "type": "string" },
+        "copilotSuggestion": { "type": "string" },
+        "orderId": { "type": "string" },
+        "channel": { "type": "string", "enum": ["WHATSAPP", "WEB", "EMAIL", "SMS"] }
+      },
+      "required": ["id", "customerName", "phoneNumber", "status", "sentiment", "createdAt", "updatedAt"]
+    },
+    "Message": {
+      "title": "Ticket Message",
+      "description": "A message within a customer support ticket thread",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "sender": { "type": "string", "enum": ["CUSTOMER", "AI", "AGENT", "SYSTEM"] },
+        "content": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "intent": { "type": "string" },
+        "confidence": { "type": "number" },
+        "sentiment": { "type": "string" },
+        "detectedLanguage": { "type": "string" }
+      },
+      "required": ["id", "sender", "content", "createdAt"]
+    },
+    "Settings": {
+      "title": "Business Settings",
+      "description": "Configurable details for the business, SLA timers, default greetings, etc.",
+      "type": "object",
+      "properties": {
+        "companyName": { "type": "string" },
+        "supportEmail": { "type": "string" },
+        "slaMinutes": { "type": "integer" },
+        "botEnabled": { "type": "boolean" },
+        "defaultGreeting": { "type": "string" },
+        "lastUpdatedBy": { "type": "string" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["companyName", "supportEmail", "slaMinutes", "botEnabled", "defaultGreeting", "updatedAt"]
+    },
+    "AgentProfile": {
+      "title": "Agent Profile",
+      "description": "Detailed profile info of the support agent",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "name": { "type": "string" },
+        "email": { "type": "string" },
+        "role": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "lastActiveAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "name", "email", "role", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/tickets/{ticketId}": {
+      "schema": "Ticket",
+      "description": "Main collection of tickets"
+    },
+    "/tickets/{ticketId}/messages/{messageId}": {
+      "schema": "Message",
+      "description": "Unbounded list of chat messages inside a ticket"
+    },
+    "/settings/global": {
+      "schema": "Settings",
+      "description": "Singleton configuration for the business template"
+    },
+    "/company_settings/{settingId}": {
+      "schema": "Settings",
+      "description": "Company-specific settings stored in Firestore"
+    },
+    "/agents/{agentId}": {
+      "schema": "AgentProfile",
+      "description": "Storage of agent profiles keyed by their authentic UID"
+    }
+  }
+}

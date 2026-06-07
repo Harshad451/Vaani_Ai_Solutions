@@ -1,0 +1,85 @@
+@import "tailwindcss";
+
+/* Custom Smooth Scrolling and Color-Matched Scrollbars */
+@layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+}
+
+/* Chrome, Safari, Edge, Opera */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.01);
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(249, 115, 22, 0.25); /* Orange accent with opacity */
+  border-radius: 9999px;
+  border: 1px solid rgba(255, 255, 255, 0.02);
+  transition: background-color 0.3s ease, transform 0.2s ease;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(249, 115, 22, 0.6); /* Vibrant orange hover status */
+  transform: scale(1.1);
+}
+
+/* Firefox scrollbar styles */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(249, 115, 22, 0.25) rgba(255, 255, 255, 0.01);
+}
+
+*::-moz-scrollbar-thumb:hover {
+  scrollbar-color: rgba(249, 115, 22, 0.6) rgba(255, 255, 255, 0.01);
+}
+
+/* Premium Tech Visual Animations */
+@keyframes ambientGlow-pulse {
+  0%, 100% { opacity: 0.15; transform: scale(1) translate(0px, 0px); }
+  50% { opacity: 0.28; transform: scale(1.08) translate(10px, -15px); }
+}
+
+@keyframes live-beam-shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+@keyframes slow-panel-drift {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-3px); }
+}
+
+.animate-ambient-pulse {
+  animation: ambientGlow-pulse 10s ease-in-out infinite;
+}
+
+.animate-live-shimmer {
+  background: linear-gradient(90deg, transparent 25%, rgba(249, 115, 22, 0.04) 50%, transparent 75%);
+  background-size: 200% 100%;
+  animation: live-beam-shimmer 3s infinite linear;
+}
+
+.animate-panel-drift {
+  animation: slow-panel-drift 6s ease-in-out infinite;
+}
+
+/* Glassmorphism panel styling */
+.glass-panel {
+  background: rgba(12, 13, 18, 0.6);
+  backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.035);
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.4);
+}
+
+.orange-radial-glow {
+  background: radial-gradient(circle at 60% 40%, rgba(249, 115, 22, 0.08) 0%, transparent 60%);
+}
+
+

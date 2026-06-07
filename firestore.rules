@@ -1,0 +1,89 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Default deny catch-all
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Helper functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isEmailVerified() {
+      return isSignedIn() && (
+        request.auth.token.email_verified == true || 
+        request.auth.token.firebase.sign_in_provider == 'password'
+      );
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // Validation Blueprints
+    function isValidTicket(data) {
+      return data.customerName is string && data.customerName.size() <= 200 &&
+             data.phoneNumber is string && data.phoneNumber.size() <= 40 &&
+             data.status is string && (data.status == 'AI_PENDING' || data.status == 'RESOLVED' || data.status == 'ESCALATED') &&
+             data.sentiment is string && (data.sentiment == 'Positive' || data.sentiment == 'Neutral' || data.sentiment == 'Negative' || data.sentiment == 'Angry');
+    }
+
+    function isValidMessage(data) {
+      return data.id is string && data.id.size() <= 100 &&
+             data.sender is string && (data.sender == 'CUSTOMER' || data.sender == 'AI' || data.sender == 'AGENT' || data.sender == 'SYSTEM') &&
+             data.content is string && data.content.size() <= 10000;
+    }
+
+    function isValidSettings(data) {
+      return data.companyName is string && data.companyName.size() <= 200 &&
+             data.supportEmail is string && data.supportEmail.size() <= 200 &&
+             data.slaMinutes is int && data.slaMinutes >= 1 && data.slaMinutes <= 1440 &&
+             data.botEnabled is bool &&
+             data.defaultGreeting is string && data.defaultGreeting.size() <= 2000;
+    }
+
+    // Agent profile rules
+    match /agents/{agentId} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn() && request.auth.uid == agentId;
+    }
+
+    // Settings rules: Only verified agents can read/write settings
+    match /settings/{settingId} {
+      allow read: if isEmailVerified();
+      allow write: if isEmailVerified() && isValidId(settingId) && isValidSettings(incoming());
+    }
+
+    match /company_settings/{settingId} {
+      allow read: if isEmailVerified();
+      allow write: if isEmailVerified() && isValidId(settingId) && isValidSettings(incoming());
+    }
+
+    // Tickets rules
+    match /tickets/{ticketId} {
+      allow read: if isEmailVerified() && isValidId(ticketId);
+      allow create: if isEmailVerified() && isValidId(ticketId) && isValidTicket(incoming());
+      allow update: if isEmailVerified() && isValidId(ticketId) && isValidTicket(incoming());
+      allow delete: if isEmailVerified() && isValidId(ticketId);
+
+      // Subcollection messages rules inside ticket matches
+      match /messages/{messageId} {
+        allow read: if isEmailVerified() && isValidId(messageId);
+        allow create: if isEmailVerified() && isValidId(messageId) && isValidMessage(incoming());
+        allow update: if isEmailVerified() && isValidId(messageId) && isValidMessage(incoming());
+        allow delete: if isEmailVerified() && isValidId(messageId);
+      }
+    }
+  }
+}

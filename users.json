@@ -1,0 +1,50 @@
+[
+  {
+    "id": "emp_1",
+    "email": "harshad@vaani.ai",
+    "name": "Harshad Phadtare",
+    "role": "Senior Operations Lead",
+    "passwordHash": "f2609620001c725df206bc0a3307c01b:d4518e8df47130693a3043098956ac1b2dafffc3d2bae1163e0b87311175b4a610bba2279982f72eb13faed7615fba20501b7770376b09f9bea682755d5a49f3",
+    "createdAt": "2026-06-05T06:29:09.410Z"
+  },
+  {
+    "id": "emp_2",
+    "email": "ashish@vaani.ai",
+    "name": "Ashish Sharma",
+    "role": "Vernacular Specialist",
+    "passwordHash": "9d5a0eaf80a5fc3cf80732a7088488ec:279a276b5a592e73dc38d169a5a4633c1f2d1fe79b0e39736ecc10ecb56634bb1848b2972e5521e97a96240d2736e55338aecabb8ec75f882b3f2ba23e6845dd",
+    "createdAt": "2026-06-05T06:29:09.410Z"
+  },
+  {
+    "id": "emp_949",
+    "email": "phadtareharshad949@gmail.com",
+    "name": "Harshad Phadtare",
+    "role": "Business Owner",
+    "passwordHash": "0d8f17419bc22a72264abbd77b7174a5:12bb978364c2c96c33f75d8685b92dd7800dd7fc87a1e65a8bc06e5db7a1fd834c00b3427b9fb707379bd7270bf986b7eb5e57c54887423922061f8ab6efbb26",
+    "createdAt": "2026-06-05T06:29:09.410Z"
+  },
+  {
+    "id": "emp_451",
+    "email": "phadtareharshad451@gmail.com",
+    "name": "Harshad Phadtare",
+    "role": "Business Owner",
+    "passwordHash": "e03039399264fe8566e9865824b5555c:c9c51427885cb72575c68bdc4002d3125dd2ee55662b2c0297961de8838539addf00c1016670f0f41e4c14caaecd99eda96862b1e6f362de4c325c954a17bbf4",
+    "createdAt": "2026-06-05T06:29:09.410Z"
+  },
+  {
+    "id": "emp_103",
+    "email": "handy103@gmail.com",
+    "name": "Handy Operator",
+    "role": "Business Owner",
+    "passwordHash": "f2609620001c725df206bc0a3307c01b:d4518e8df47130693a3043098956ac1b2dafffc3d2bae1163e0b87311175b4a610bba2279982f72eb13faed7615fba20501b7770376b09f9bea682755d5a49f3",
+    "createdAt": "2026-06-05T06:29:09.410Z"
+  },
+  {
+    "id": "emp_104",
+    "email": "donaldtrump01@gmail.com",
+    "name": "Donald Trump",
+    "role": "Business Owner",
+    "passwordHash": "e03039399264fe8566e9865824b5555c:c9c51427885cb72575c68bdc4002d3125dd2ee55662b2c0297961de8838539addf00c1016670f0f41e4c14caaecd99eda96862b1e6f362de4c325c954a17bbf4",
+    "createdAt": "2026-06-05T06:29:09.410Z"
+  }
+]
