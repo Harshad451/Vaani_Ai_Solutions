@@ -1244,7 +1244,12 @@ export default function App() {
 
   const fetchSettings = async () => {
     try {
-      const res = await fetch('/api/settings');
+      const token = localStorage.getItem('vaani_logged_token') || authToken;
+      const headers: Record<string, string> = {};
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+      const res = await fetch('/api/settings', { headers });
       if (res.ok) {
         const data = await res.json();
         setSettings(data);
@@ -2863,9 +2868,14 @@ export default function App() {
       ].join('\n\n');
 
       try {
+        const token = localStorage.getItem('vaani_logged_token') || authToken;
+        const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+        if (token) {
+          headers['Authorization'] = `Bearer ${token}`;
+        }
         const res = await fetch('/api/settings', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers,
           body: JSON.stringify({
             ...settings,
             companyName: settings.companyName,

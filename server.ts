@@ -1236,6 +1236,8 @@ app.post('/api/settings', requireAuth, async (req, res) => {
     saveEmployees();
   }
 
+  const existingSettings = getSettingsForCompany(companyName);
+
   const settings: Settings = {
     companyName,
     supportEmail,
@@ -1246,7 +1248,21 @@ app.post('/api/settings', requireAuth, async (req, res) => {
     isTrained: isTrained !== undefined ? !!isTrained : true,
     brandKnowledge: brandKnowledge !== undefined ? String(brandKnowledge) : "",
     businessIndustry: businessIndustry !== undefined ? String(businessIndustry) : "",
-    supportTone: supportTone !== undefined ? String(supportTone) : ""
+    supportTone: supportTone !== undefined ? String(supportTone) : "",
+    
+    // Preserve individual grounding knowledge base string fields from grounding form
+    kbBusiness: req.body.kbBusiness !== undefined ? String(req.body.kbBusiness) : existingSettings.kbBusiness,
+    kbReturns: req.body.kbReturns !== undefined ? String(req.body.kbReturns) : existingSettings.kbReturns,
+    kbShipping: req.body.kbShipping !== undefined ? String(req.body.kbShipping) : existingSettings.kbShipping,
+    kbEscalation: req.body.kbEscalation !== undefined ? String(req.body.kbEscalation) : existingSettings.kbEscalation,
+
+    // Preserve subscription settings securely - once active, they cannot be accidentally deactivated or reset by client-side settings edits or training
+    isSubscribed: existingSettings.isSubscribed || !!req.body.isSubscribed,
+    subscriptionPlan: existingSettings.subscriptionPlan || req.body.subscriptionPlan || 'monthly',
+    subscriptionTier: existingSettings.subscriptionTier || req.body.subscriptionTier || 'PRO',
+    subscriptionExpiresAt: existingSettings.subscriptionExpiresAt || req.body.subscriptionExpiresAt || '',
+    subscriptionDaysLeft: (existingSettings.subscriptionDaysLeft && existingSettings.subscriptionDaysLeft > 0) ? existingSettings.subscriptionDaysLeft : (req.body.subscriptionDaysLeft || 0),
+    subscriptionStartedAt: existingSettings.subscriptionStartedAt || req.body.subscriptionStartedAt || '',
   };
 
   companySettings[companyName] = settings;

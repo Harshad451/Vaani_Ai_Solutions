@@ -433,8 +433,14 @@ export function SubscriptionTab({
                     setIsProcessingPayment(true);
                     setPaymentError(null);
                     try {
+                      const token = localStorage.getItem('vaani_logged_token');
+                      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+                      if (token) {
+                        headers['Authorization'] = `Bearer ${token}`;
+                      }
                       const res = await customFetch('/api/subscription/purchase', {
                         method: 'POST',
+                        headers,
                         body: JSON.stringify({
                           tier: checkoutPlan,
                           plan: billingInterval,
