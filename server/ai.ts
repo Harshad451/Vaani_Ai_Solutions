@@ -105,29 +105,66 @@ export const getSystemPromptRule = (ticket?: Ticket): string => {
     ? `You are an expert human customer support agent drafting a direct reply for ${settings.companyName || 'our business'}, which operates in the '${settings.businessIndustry || 'Retail'}' industry.`
     : `You are the primary intelligence router and vernacular response engine for ${settings.companyName || 'our business'}, which operates in the '${settings.businessIndustry || 'Retail'}' industry.`;
 
+  // Determine current active message content to check for bilingual keywords
+  const latestMsg = ticket?.messages && ticket.messages.length > 0 
+    ? ticket.messages[ticket.messages.length - 1].content 
+    : "";
+
+  const normMsg = latestMsg.toLowerCase();
+  // We check if the customer message is strongly Hinglish (transliterated Hindi/English mixed)
+  const hasHinglishKeywords = normMsg.includes("mera ") || normMsg.includes(" kab ") || normMsg.includes("nahi ") || 
+                              normMsg.includes(" hai") || normMsg.includes("aayega") || normMsg.includes("bhai ") || 
+                              normMsg.includes("karo") || normMsg.includes("mila ") || normMsg.includes("hoga ") || 
+                              normMsg.includes("kya ") || normMsg.includes("de do") || normMsg.includes(" kab") ||
+                              normMsg.includes(" swagat") || normMsg.includes(" swasth") || normMsg.includes("namaste") ||
+                              normMsg.includes(" swarg") || normMsg.includes(" swaraj") || normMsg.includes(" swad");
+
+  // Default target response language based on customer's manually chosen preference
+  let targetLang = "English";
+  if (ticket && ticket.languagePreference) {
+    targetLang = ticket.languagePreference;
+  }
+
+  // FORCE English if they selected English and their latest message is in English or is a neutral phrase/Order ID code
+  if (targetLang === 'English') {
+    if (hasHinglishKeywords) {
+      // If they explicitly interjected Hinglish words despite selecting English, adapt to Hinglish to match dialect
+      targetLang = 'Hinglish';
+    } else {
+      targetLang = 'English';
+    }
+  } else if (targetLang === 'Hinglish') {
+    // If they selected Hinglish, but their latest message is entirely in pure English, we can respect their flow or keep Hinglish
+    if (!hasHinglishKeywords && /^[a-zA-Z\s.,!?'-]+$/.test(latestMsg.trim()) && latestMsg.trim().split(/\s+/).length > 2) {
+      targetLang = 'English';
+    }
+  }
+
   let taskDescription = isEscalated
-    ? `Because this ticket has been ESCALATED to human support, your task is to draft a helpful copilot suggestion as a human operator who is personally assisting this customer. The response "vernacular_reply" in your JSON output MUST be generated from the direct perspective of a human support representative (e.g., using first-person, highly personal, warm, and empathetic language such as 'I' or 'We', reassuring the customer that a human agent has personally taken over to resolve their issues, rather than sounding like an automated chatbot/AI loop). Preserving the script and dialect used (e.g., transliterated Hinglish/Latin Hindi, native Hindi script, or standard English) as based on user's input/preferences.`
-    : `Your task is to analyze the customer's query within the context of any previous conversation history and generate an exceptionally accurate, empathetic, and context-specific response in the same script and dialect as the user's input (e.g., transliterated Hinglish/Latin Hindi, native Hindi script, or standard English).`;
+    ? `Because this ticket has been ESCALATED to human support, your task is to draft a helpful copilot suggestion as a human operator who is personally assisting this customer. The response "vernacular_reply" in your JSON output MUST be generated from the direct perspective of a human support representative (e.g., using first-person, highly personal, warm, and empathetic language such as 'I' or 'We', reassuring the customer that a human agent has personally taken over to resolve their issues, rather than sounding like an automated chatbot/AI loop). Preserving the script and dialect used (strictly **${targetLang}**) as based on the customer's input context.`
+    : `Your task is to analyze the customer's query within the context of any previous conversation history and generate an exceptionally accurate, empathetic, and context-specific response. Crucially, your entire response (including "vernacular_reply") MUST be written strictly in **${targetLang}** (For 'Hinglish': use Latin-script colloquial Hindi-English mixed e.g. 'Aapka order dispatch ho chuka hai'; For 'Hindi': use native Devnagari Hindi text e.g. 'आपका ऑर्डर भेज दिया गया है'; For 'English': use standard fluent English).`;
 
   let prompt = `${persona}
 Brand Knowledge / Business Context:
 ${settings.brandKnowledge || 'We provide general support with helpful customer care operators.'}
 
-${taskDescription}`;
+${taskDescription}
 
-  if (ticket && ticket.languagePreference) {
-    prompt += `\n\nCRITICAL LANGUAGE CONSTRAINT:\nThe customer has explicitly indicated a preference for communicating in **${ticket.languagePreference}**. Therefore, your response "vernacular_reply" in the JSON structure MUST be generated strictly using **${ticket.languagePreference}** language script (For 'Hinglish': use Latin-script colloquial Hindi-English mixed e.g. 'Aapka order dispatch ho chuka hai'; For 'Hindi': use native Devnagari Hindi text e.g. 'आपका ऑर्डर भेज दिया गया है'; For 'English': use standard fluent English). Do not cross standard thresholds of their selection.`;
-  }
+CRITICAL LANGUAGE & LINGUISTIC SELECTION RULE (ANTI-HINGLISH HYBRID CORRUPTIONS):
+- The target language for your reply: **${targetLang}**
+- You are **STRICTLY FORBIDDEN** from replying in Hinglish if the target language is **English** or **Hindi**. 
+- Never intermix Hindi transliterated phrases (like "Swagat hai", "Aapka order", "swagat", "Swasth/Namaste") when the target language is **English**. If the target language is English, write 100% grammatically correct, highly fluent, standard English with NO transliterated Hindi words or phrases under any circumstance.
+- You must **ONLY** reply in Hinglish if the target language is determined as **Hinglish** (such as when the customer specifically speaks in Hinglish in their latest message or has selected Hinglish as their preference).`;
 
   prompt += `\n\nAnalyze the conversation context and latest message, and output standard, valid JSON according to this exact schema:
 {
-  "detected_language": "Detected language (Must be 'Hinglish (Hindi-English)' or 'Hindi (Native)' or 'English')",
+  "detected_language": "Detected language (Must be exactly 'English', 'Hindi (Native)', or 'Hinglish (Hindi-English)')",
   "intent": "Categorized intent. Must be exactly one of: ORDER_TRACKING, RETURN_REQUEST, REFUND_STATUS, PRODUCT_INQUIRY, COUPON_ISSUES, DELIVERY_COMPLAINT, HUMAN_ESCALATION",
   "confidence": float between 0.0 and 1.0,
   "should_escalate": boolean (true ONLY for very urgent cases, legal threats, extreme abuse, or explicit requests for live support managers. For normal questions, AI should attempt to solve customer issues directly with at least 90% confidence. Set should_escalate to true ONLY when confidence is under 0.90 or it is a truly urgent escalation),
   "sentiment": "Positive" | "Neutral" | "Negative" | "Angry",
   "close_ticket": boolean (true ONLY when the customer's issue has been fully addressed and resolved, and no further action, clarification, or confirmation is required from either support or the customer. Set to true if the customer says thank you, expresses satisfaction, says goodbye, or when the issue is fully answered and resolves the ticket naturally. Set to false otherwise),
-  "vernacular_reply": "A concise, highly empathetic, grammatically correct support solution answering the specific questions asked by the customer last, preserving the language script used."
+  "vernacular_reply": "A concise, highly empathetic, grammatically correct support solution answering the specific questions asked by the customer last, written 100% in the target language (${targetLang}) script."
 }
 IMPORTANT: Output only the raw valid JSON payload without backticks or markdown formatting.
 
@@ -375,8 +412,26 @@ export async function generateCopilotSuggestion(ticket: Ticket, overrideMessage?
 
   // Append linked order parameters context dynamically if registered to guide high-fidelity responses
   let orderInfoPrompt = "";
-  if (ticket.orderDetail) {
-    orderInfoPrompt = `\n\n[LINKED ORDER TRANSACTION LOGS]:\n- Order Reference ID: ${ticket.orderDetail.id}\n- Customer Name: ${ticket.orderDetail.customerName}\n- Product Purchased: ${ticket.orderDetail.itemName}\n- Logistics status: ${ticket.orderDetail.status}\n- Payment Mode Used: ${ticket.orderDetail.paymentMode}\n- Order amount: ₹${ticket.orderDetail.cost}\n- Shipping carrier: ${ticket.orderDetail.carrier || "N/A"}\n- Expected delivery: ${ticket.orderDetail.estimatedDelivery || "N/A"}\n\nIMPORTANT: Leverage these exact purchase facts to address the user query explicitly and highly accurately in your reply string!`;
+  if (ticket.orderNameMismatch) {
+    orderInfoPrompt = `\n\n[LINKED ORDER PRIVACY / NAME MISMATCH STATE]:\n- The Customer entered a valid Order ID "${ticket.orderId || ''}", but this order belongs to a different customer ("${ticket.orderDetail?.customerName || ''}") and is NOT linked with this customer\'s name ("${ticket.customerName || ''}").\n\nCRITICAL DATA PRIVACY DIRECTIVE: You are STRICTLY FORBIDDEN from revealing ANY details about this order (including what product was purchased, logistics delivery status, carrier, amount, etc.) to this customer. You MUST politely and directly inform the customer that "This Order ID is not linked with your name" and ask them to check their invoice and enter the correct Order ID. Match their target language preference and brand tone.`;
+  } else if (ticket.orderDetail && !ticket.orderIdInvalid) {
+    let rawMetaText = "";
+    if (ticket.orderDetail.rawRecord && typeof ticket.orderDetail.rawRecord === 'object') {
+      try {
+        const entries = Object.entries(ticket.orderDetail.rawRecord)
+          .map(([k, v]) => `- ${k}: ${typeof v === 'object' ? JSON.stringify(v) : v}`)
+          .join('\n');
+        if (entries) {
+          rawMetaText = `\n\n[ALL LIVE DATABASE COLUMNS & CUSTOM FIELDS]:\n${entries}`;
+        }
+      } catch (err) {
+        console.warn("Failed to serialize rawRecord:", err);
+      }
+    }
+
+    orderInfoPrompt = `\n\n[LINKED ORDER TRANSACTION LOGS]:\n- Order Reference ID: ${ticket.orderDetail.id}\n- Customer Name: ${ticket.orderDetail.customerName}\n- Product Purchased: ${ticket.orderDetail.itemName}\n- Logistics status: ${ticket.orderDetail.status}\n- Payment Mode Used: ${ticket.orderDetail.paymentMode}\n- Order amount: ₹${ticket.orderDetail.cost}\n- Shipping carrier: ${ticket.orderDetail.carrier || "N/A"}\n- Expected delivery: ${ticket.orderDetail.estimatedDelivery || "N/A"}${rawMetaText}\n\nIMPORTANT: Leverage these exact purchase facts to address the user query explicitly and highly accurately in your reply string!`;
+  } else if (ticket.orderIdInvalid) {
+    orderInfoPrompt = `\n\n[LINKED ORDER ERROR STATE]:\n- The Customer has entered or referred to an Order ID (or number) "${ticket.orderId || ''}", but this order ID does NOT exist in our databases or live integration connections, and is completely invalid!\n\nIMPORTANT: You MUST explicitly and politely inform the customer that the order number or ID they provided is invalid or does not exist in our system, and that they should double check/verify their invoice and try again. Maintain the requested support brand tone and translation/localization rules strictly.`;
   }
 
   const claudeClient = getClaudeClient();

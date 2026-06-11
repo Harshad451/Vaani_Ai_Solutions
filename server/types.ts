@@ -27,6 +27,20 @@ export interface Settings {
   subscriptionExpiresAt?: string;
   subscriptionDaysLeft?: number;
   subscriptionStartedAt?: string;
+
+  // Real-time Database and REST API Integration Settings
+  dbIntegrationType?: 'POSTGRESQL' | 'MYSQL' | 'REST_API' | 'SUPABASE' | 'NONE';
+  dbHost?: string;
+  dbPort?: number;
+  dbUser?: string;
+  dbPassword?: string;
+  dbName?: string;
+  dbSsl?: boolean;
+  dbQueryTemplate?: string;
+  apiUrl?: string;
+  apiAuthHeader?: string;
+  apiAuthValue?: string;
+  apiOrderPath?: string;
 }
 
 export interface ActiveSession {

@@ -1,1 +1,66 @@
-[]
+[
+  {
+    "id": "ticket_77043",
+    "customerName": "Harshad",
+    "phoneNumber": "918879713271",
+    "status": "RESOLVED",
+    "sentiment": "Neutral",
+    "createdAt": "2026-06-08T16:03:51.413Z",
+    "updatedAt": "2026-06-08T16:05:19.647Z",
+    "slaExpiresAt": "2026-06-08T16:13:51.413Z",
+    "messages": [
+      {
+        "id": "msg_27999",
+        "sender": "CUSTOMER",
+        "content": "Hello! I would like to chat with support.",
+        "createdAt": "2026-06-08T16:03:51.413Z"
+      },
+      {
+        "id": "msg_96989",
+        "sender": "AI",
+        "content": "Thank you for contacting us! 🌟\nIn which language are you comfortable speaking today? Please choose from below / अपनी पसंदीदा भाषा चुनें:\n\n1. English\n2. Hindi (हिंदी)\n3. Hinglish (Transliterated Hindi)\n\nReply with 'English', 'Hindi', or 'Hinglish' to set your choice.",
+        "createdAt": "2026-06-08T16:03:52.655Z",
+        "intent": "LANGUAGE_PREFERENCE",
+        "confidence": 0.99,
+        "sentiment": "Neutral",
+        "detectedLanguage": "English"
+      },
+      {
+        "id": "msg_51705",
+        "sender": "CUSTOMER",
+        "content": "english",
+        "createdAt": "2026-06-08T16:04:01.073Z"
+      },
+      {
+        "id": "msg_96457",
+        "sender": "AI",
+        "content": "Thank you for selecting English! I am here to assist you with any questions about our supreme custom commodities or general utility goods. Please let me know how I can help you today.",
+        "createdAt": "2026-06-08T16:04:03.940Z",
+        "intent": "PRODUCT_INQUIRY",
+        "confidence": 1,
+        "sentiment": "Neutral",
+        "detectedLanguage": "English"
+      },
+      {
+        "id": "msg_29953",
+        "sender": "SYSTEM",
+        "content": "Conversation automatically closed. Reason: Customer Inactivity",
+        "createdAt": "2026-06-08T16:05:04.867Z"
+      },
+      {
+        "id": "msg_17700",
+        "sender": "SYSTEM",
+        "content": "Customer submitted feedback survey: Rating of 2 star(s).",
+        "createdAt": "2026-06-08T16:05:19.647Z"
+      }
+    ],
+    "channel": "WEB",
+    "companyName": "XYZ Corp",
+    "detectedLanguage": "English",
+    "lastIntent": "PRODUCT_INQUIRY",
+    "copilotSuggestion": "Thank you for selecting English! I am here to assist you with any questions about our supreme custom commodities or general utility goods. Please let me know how I can help you today.",
+    "humanRequested": true,
+    "rating": 2,
+    "ratingFeedback": ""
+  }
+]

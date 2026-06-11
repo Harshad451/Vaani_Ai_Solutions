@@ -170,10 +170,6 @@ export function DatasetTab({
                 >
                   <option value="Hinglish">Hinglish</option>
                   <option value="Hindi">Hindi (Native)</option>
-                  <option value="Tanglish">Tanglish</option>
-                  <option value="Tamil">Tamil (Native)</option>
-                  <option value="Telugu">Telugu</option>
-                  <option value="Bengali">Bengali</option>
                   <option value="English">English</option>
                 </select>
               </div>

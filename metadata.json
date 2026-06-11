@@ -1,6 +1,6 @@
 {
-  "name": "VaaniAI Support Console",
-  "description": "Production-grade customer support platform with real-time ticket routing, pre-trained vernacular training datasets, Express API server, and Jetpack Compose Android source code explorer.",
+  "name": "VaaniAI Support Desk",
+  "description": "Vernacular customer support desk with real-time routing",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

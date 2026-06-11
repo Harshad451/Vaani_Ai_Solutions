@@ -71,194 +71,10 @@ import { AndroidTab } from './components/AndroidTab';
 import { DatasetTab } from './components/DatasetTab';
 import { DashboardTab } from './components/DashboardTab';
 import { InboxTab } from './components/InboxTab';
+import { CustomerPortal } from './components/CustomerPortal';
 
 const getSuggestedReplies = (ticket: Ticket): { text: string; label: string; action: 'insert' | 'resolve' }[] => {
   return getSuggestedRepliesNew(ticket);
-  /*
-  const intent = ticket.lastIntent || 'PRODUCT_INQUIRY';
-  const language = ticket.detectedLanguage || 'English';
-  
-  const suggestions: { text: string; label: string; action: 'insert' | 'resolve' }[] = [];
-
-  // If a context-aware smart dynamic AI suggestion exists on the ticket, priority-prepend it!
-  if (ticket.copilotSuggestion) {
-    suggestions.push({
-      text: ticket.copilotSuggestion,
-      label: "Smart AI Copilot (Context-Aware Reply)",
-      action: 'insert'
-    });
-  }
-
-  // 1. Language matched general query response (Heavily trained and refined responses)
-  let supportText = "";
-  
-  const isHindiOrHinglish = language.includes('Hindi') || language.includes('Hinglish');
-  const isTamilOrTanglish = language.includes('Tamil') || language.includes('Tanglish') || language.includes('Tamglish') || language.includes('Tinglish');
-  const isTelugu = language.includes('Telugu') || language.includes('Telglish');
-  const isKannada = language.includes('Kannada') || language.includes('Kanglish');
-  const isMarathi = language.includes('Marathi');
-  const isBengali = language.includes('Bengali');
-  const isGujarati = language.includes('Gujarati');
-  const isPunjabi = language.includes('Punjabi');
-
-  if (intent === 'ORDER_TRACKING') {
-    if (isHindiOrHinglish) {
-      supportText = "नमस्ते! हमने चेक किया है: आपका ऑर्डर 'DTD12498' दिल्ली हब से डिस्पैच हो चुका है। यह कल शाम ६ बजे से पहले डिलीवर हो जाएगा। कृपया धैर्य रखें!";
-    } else if (isTamilOrTanglish) {
-      supportText = "வணக்கம்! உங்கள் ஆர்டர் DTD12498 நேற்று அனுப்பப்பட்டுவிட்டது. இது நாளை மாலை 6 மணிக்குள் உங்கள் முகவரியை வந்தடையும். நன்றி!";
-    } else if (isTelugu) {
-      supportText = "నమస్కారం! మీ ఆర్డర్ DTD12498 విజయవంతంగా డిస్పాచ్ చేయబడింది. రేపు సాయంత్రం 6 గంటల లోపు ఇది మీకు ఖచ్చితంగా డెలివరీ అవుతుంది.";
-    } else if (isKannada) {
-      supportText = "ನಮಸ್ತೆ! ನಿಮ್ಮ ಆರ್ಡರ್ DTD12498 ಅನ್ನು ರವಾನಿಸಲಾಗಿದೆ. ಇದು ನಾಳೆ ಸಂಜೆ 6 ಗಂಟೆಯೊಳಗೆ ನಿಮ್ಮನ್ನು ತಲುಪಲಿದೆ. ದಯವಿಟ್ಟು ಸಹಕರಿಸಿ.";
-    } else if (isMarathi) {
-      supportText = "नमस्कार! आपला ऑर्डर DTD12498 पाठवण्यात आला आहे. तो उद्या संध्याकाळी ६ वाजेपर्यंत तुमच्यापर्यंत पोहोचेल. धन्यवाद!";
-    } else if (isBengali) {
-      supportText = "নমস্কার! আপনার অর্ডার DTD12498 ডিসপ্যাচ করা হয়েছে এবং এটি আগামীকাল বিকেল ৬টার মধ্যে ডেলিভারি হয়ে যাবে। ধন্যবাদ!";
-    } else if (isGujarati) {
-      supportText = "નમસ્તે! ક્ષમા કરશો, આપનો ઓર્ડર DTD12498 રવાના થઈ ગયો છે. આવતીકાલે સાંજ સુધીમાં આપને ચોક્કસ મળી જશે.";
-    } else if (isPunjabi) {
-      supportText = "ਸਤਿ ਸ੍ਰੀ ਅਕਾਲ! ਤੁਹਾਡਾ ਆਰਡਰ DTD12498 ਭੇਜ ਦਿੱਤਾ ਗਿਆ ਹੈ ਅਤੇ ਇਹ ਕੱਲ੍ਹ ਸ਼ਾਮ 6 ਵਜੇ ਤੱਕ ਡਿਲੀਵਰ ਹੋ ਜਾਵੇਗਾ।";
-    } else {
-      supportText = "Hello! Quick status update regarding your shipment: our logistics team confirms package DTD12498 is dispatched and in transit via the Delhi hub. It is scheduled for delivery tomorrow before 6 PM. Thank you!";
-    }
-  } else if (intent === 'REFUND_STATUS') {
-    if (isHindiOrHinglish) {
-      supportText = "नमस्ते! कृपया निश्चिंत रहें। आपके ऑर्डर का INR 1,499 का रिफंड प्रक्रिया में है (UPI Ref ID: TXN89324X)। यह ३ से ५ व्यावसायिक दिनों में आपके खाते में जुड़ जाएगा। धन्यवाद।";
-    } else if (isTamilOrTanglish) {
-      supportText = "வணக்கம்! உங்கள் கவலை புரிகிறது. உங்கள் ரூ. 1,499 ரீஃபண்ட் (UPI Ref ID: TXN89324X) துவங்கப்பட்டுவிட்டது. அடுத்த 3-5 வேலை நாட்களில் உங்கள் வங்கிக் கணக்கில் வந்துவிடும்.";
-    } else if (isTelugu) {
-      supportText = "నమస్కారం! మీ రీఫండ్ మొత్తం రూ. 1,499 (UPI Ref ID: TXN89324X) ప్రాసెస్ చేయబడుతోంది. మరో 3-5 పని దినాల్లో ఇది మీ అకౌంట్‌లో జమ చేయబడుతుంది.";
-    } else if (isKannada) {
-      supportText = "ನಮಸ್ತೆ! ಚಿಂತಿಸಬೇಡಿ, ನಿಮ್ಮ ರೂ. 1,499 ರಿಫಂಡ್ ಪ್ರಕ್ರಿಯೆಯಲ್ಲಿದೆ (UPI Ref ID: TXN89324X). ಮುಂದಿನ 3-5 ಕೆಲಸದ ದಿನಗಳ ಒಳಗೆ ನಿಮ್ಮ ಖಾತೆಗೆ ಜಮೆಯಾಗಲಿದೆ.";
-    } else if (isMarathi) {
-      supportText = "नमस्कार! आपले ₹१,४९९ चे रिफंड मंजूर झाले असून त्याचे काम सुरू आहे. येत्या ३ ते ५ कामकाजाच्या दिवसांत पैसे तुमच्या खात्यात जमा होतील.";
-    } else if (isBengali) {
-      supportText = "নমস্কার! আপনার ১৪৯৯ টাকার রিফান্ড প্রক্রিয়াটি শুরু হয়েছে (UPI Ref TXN89324X)। আগামী ৩-৫ কার্যদিবসের মধ্যে আপনার অ্যাকাউন্টে টাকা ব্যাঙ্ক ট্রান্সফার হয়ে যাবে।";
-    } else if (isGujarati) {
-      supportText = "નમસ્તે! આપના રૂ. ૧,૪૯૯ રિફંડની પ્રક્રિયા શરૂ થઈ ગઈ છે (UPI Ref: TXN89324X), જે આપતા ૩ થી ૫ કામકાજના દિવસોમાં આપના ખાતામાં જમા થશે.";
-    } else if (isPunjabi) {
-      supportText = "ਸਤਿ ਸ੍ਰੀ ਅਕਾਲ! ਤੁਹਾਡਾ 1,499 ਰੁਪਏ ਦਾ ਰਿਫੰਡ (UPI Ref: TXN89324X) ਪ੍ਰੋਸੈਸ ਹੋ ਰਿਹਾ ਹੈ। ਅਗਲੇ 3-5 ਦਿਨਾਂ ਵਿੱਚ ਤੁਹਾਡੇ ਬੈਂਕ ਖਾਤੇ ਵਿੱਚ ਆ ਜਾਵੇਗਾ।";
-    } else {
-      supportText = "Hello! We apologize for the delay. Your refund of INR 1,499 has been authorized and initiated to your source payment account (UPI Ref: TXN89324X). It should reflect in your statement within 3-5 business days.";
-    }
-  } else if (intent === 'RETURN_REQUEST') {
-    if (isHindiOrHinglish) {
-      supportText = "नमस्ते! रिप्लेसमेंट/रिटर्न अरेंज कर दिया गया है। आप ऐप के पर 'My Orders' सेक्शन में जाकर 'Return/Exchange' दर्ज कर सकते हैं। सोमवार सुबह हमारा एजेंट डिलीवरी पिकअप के लिए आएगा।";
-    } else if (isTamilOrTanglish) {
-      supportText = "வணக்கம்! ரிட்டர்ன் பாலிசிப்படி உங்கள் மாற்று ஆடைக்கு ஏற்பாடு செய்யப்பட்டுள்ளது. 'My Orders' பக்கத்தில் பதிவு செய்யவும். திங்கள் காலை எங்கள் முகவர் வந்து பெற்றுக்கொள்வார்.";
-    } else if (isTelugu) {
-      supportText = "నమస్కారం! ఎక్స్చేంజ్/రిటర్న్ ఆమోదించబడింది. మీరు 'My Orders' విభాగంలో రిటర్న్ రిక్వెస్ట్ పెట్టవచ్చు. సోమవారం ఉదయం కురియర్ బాయ్ మీ ప్యాకెట్ పికప్ చేయడానికి వస్తాడు.";
-    } else if (isKannada) {
-      supportText = "ನಮಸ್ತೆ! ದಯವಿಟ್ಟು ನಿಮ್ಮ ಆಪ್‌ನಲ್ಲಿನ 'My Orders' ವಿಭಾಗಕ್ಕೆ ಹೋಗಿ ರಿಟರ್ನ್ ರಿಕ್ವೆಸ್ಟ್ ಸಲ್ಲಿಸಿ. ಸೋಮವಾರ ಬೆಳಗ್ಗೆ ನಮ್ಮ ಡೆಲಿವರಿ ಏಜೆಂಟ್ ಬಂದು ಪಾರ್ಸೆಲ್ ಪಡೆಯಲಿದ್ದಾರೆ.";
-    } else if (isMarathi) {
-      supportText = "नमस्कार! एक्सचेंज/रिटर्न मंजूर केले गेले आहे. 'My Orders' मध्ये जाऊन आपली मागणी नोंदवा. सोमवार सकाळी आमचा प्रतिनिधी पिकअपसाठी तुमच्या घरी येईल.";
-    } else if (isBengali) {
-      supportText = "নমস্কার! এক্সচেঞ্জ/রিটার্ন অনুরোধটি নেওয়া হয়েছে। অনুগ্রহ করে 'My Orders' সেকশনে গিয়ে আবেদন করুন। সোমবার সকালে কুরিয়ার বয় পণ্যটি সংগ্রহ করতে আসবে।";
-    } else if (isGujarati) {
-      supportText = "નમસ્તે! કુર્તીનું સાઈઝ એક્સચેન્જ સ્વીકારવામાં આવ્યું છે. 'My Orders' પર રિકવેસ્ટ મોકલો, સોમવારે સવારે અમારી ટીમ પિકઅપ માટે આવશે.";
-    } else if (isPunjabi) {
-      supportText = "ਸਤਿ ਸ੍ਰੀ ਅਕਾਲ! ਐਕਸਚੇਂਜ/ਰਿਟਰਨ ਦੀ ਬੇਨਤੀ ਮਨਜ਼ੂਰ ਹੋ ਗਈ ਹੈ। ਸੋਮਵਾਰ ਸਵੇਰੇ ਸਾਡਾ ਏਜੰਟ ਤੁਹਾਡੇ ਪਤੇ ਤੋਂ ਪ੍ਰੋਡਕਟ ਪਿਕਅਪ ਕਰ ਲਵੇਗਾ।";
-    } else {
-      supportText = "Hello! We've scheduled a pickup for this return. Please initiate the request from the 'My Orders' screen, select 'Return/Exchange' along with your size/item correction preference. A courier will collect it Monday morning.";
-    }
-  } else if (intent === 'COUPON_ISSUES') {
-    if (isHindiOrHinglish) {
-      supportText = "नमस्ते! यदि पुराना कूप कोड नहीं चल रहा, तो कृपया 'WELCOME10' कूपन कोड दर्ज करें, यह आपको तत्काल आपके कार्ट मूल्य पर १०% की अतिरिक्त छूट प्रदान करेगा।";
-    } else if (isTamilOrTanglish) {
-      supportText = "வணக்கம்! கூப்பன் கோட் வேலை செய்யவில்லை என்றால், கட்டணப் பக்கத்தில் 'WELCOME10' ஐப் பயன்படுத்தவும். உங்களுக்கு நேரடி 10% தள்ளுபடி கிடைக்கும்.";
-    } else if (isTelugu) {
-      supportText = "నమస్కారం! పాత కూపన్ పని చేయకపోతే, దయచేసి 'WELCOME10' కోడ్ ఉపయోగించండి. ఇది మీకు తక్షణమే 10% అదనపు డిస్కౌంట్ అందిస్తుంది.";
-    } else if (isKannada) {
-      supportText = "ನಮಸ್ತೆ! ಕೂಪನ್ ದೋಷವಿದ್ದರೆ ಚೆಕ್ಔಟ್ ಸಮಯದಲ್ಲಿ 'WELCOME10' ಕೋಡ್ ಬಳಸಿ. ಇದು ನಿಮಗೆ ತಕ್ಷಣವೇ 10% ರಿಯಾಯಿತಿ ಒದಗಿಸುತ್ತದೆ.";
-    } else if (isMarathi) {
-      supportText = "नमस्कार! जुना कूपन कोड चालत नसेल तर कृपया 'WELCOME10' वापरा. यामुळे तुम्हाला तत्काळ १०% अतिरिक्त सूट मिळेल.";
-    } else if (isBengali) {
-      supportText = "নমস্কার! যদি আপনার কুপন কোডটি কাজ না করে, তবে অনুগ্রহ করে 'WELCOME10' ব্যবহার করুন। এতে আপনার কার্ট ভ্যালুর ওপর সরাসরি ১০% ডিসকাউন্ট পাবেন।";
-    } else if (isGujarati) {
-      supportText = "નમસ્તે! જો આપનો કૂપન કોડ અમાન્ય છે, તો કૃપા કરીને 'WELCOME10' કોડનો ઉપયોગ કરો. તેનાથી આપને સપાટ ૧૦% ડિસ્કાઉન્ટ મળશે.";
-    } else if (isPunjabi) {
-      supportText = "ਸਤਿ ਸ੍ਰੀ ਅਕਾਲ! ਜੇਕਰ ਕੋਡ ਕੰਮ ਨਹੀਂ ਕਰ ਰਿਹਾ, ਤਾਂ ਕਿਰਪਾ ਕਰਕੇ 'WELCOME10' ਦੀ ਵਰਤੋਂ ਕਰੋ, ਜਿਸ ਨਾਲ ਤੁਹਾਨੂੰ 10% ਦੀ ਛੋਟ ਮਿਲੇਗੀ।";
-    } else {
-      supportText = "Hello! It appears the code was invalid. To fix this, please try using coupon code 'WELCOME10' at checkpoint for an instant flat 10% cash discount on your total cart checkout value.";
-    }
-  } else if (intent === 'HUMAN_ESCALATION') {
-    if (isHindiOrHinglish) {
-      supportText = "नमस्ते! हमारे वरिष्ठ सहायता विशेषज्ञ चर्चा में शामिल हो सकते हैं, लेकिन तब तक क्या मैं आपके ऑर्डर नंबर या समस्या का विवरण जानकर सीधे समाधान करने में आपकी कोई और मदद कर सकता हूँ?";
-    } else if (isTamilOrTanglish) {
-      supportText = "வணக்கம், நான் உங்களை சீனியர் மேலாளருடன் இணைக்கிறேன். அதற்குள் உங்கள் ஆர்டர் விவரங்களை என்னிடம் பகிர்ந்தால் நானே உதவ முடியும்.";
-    } else if (isTelugu) {
-      supportText = "నమస్కారం! నేను మీ కాల్ ని సీనియర్ మేనేజర్ కి బదిలీ చేస్తున్నాను, అంతలోపు మీ సమస్య మరియు ఆర్德ర్ నెంబర్ చెప్తే నేను సహాయం చేయడానికి ప్రయత్నిస్తాను.";
-    } else if (isKannada) {
-      supportText = "ನಮಸ್ತೆ! ನಾನು ಹಿರಿಯ ಮ್ಯಾನೇಜರ್‌ಗೆ ಈ ಕರೆ ವರ್ಗಾಯಿಸುತ್ತಿದ್ದೇನೆ. ದಯವಿಟ್ಟು ಅಲ್ಲಿಯವರೆಗೆ ನಿಮ್ಮ ಸಮಸ್ಯೆಯು ಹಾಗೂ ಆರ್ಡರ್ ಸಂಖ್ಯೆಯನ್ನು ಶೇರ್ ಮಾಡಿ.";
-    } else if (isMarathi) {
-      supportText = "नमस्कार! मी आपले तिकीट वरिष्ठ व्यवस्थापकांकडे पाठवत आहे, तोपर्यंत जर तुम्ही मला आपला क्रमांक व समस्या सांगितली तर मी स्वतः मदत करण्याचा प्रयत्न करेन.";
-    } else if (isBengali) {
-      supportText = "নমস্কার! আমি কোনো সিনিয়র ম্যানেজারের সাথে আপনাকে কানেক্ট করছি, ততক্ষণ অনুগ্রহ করে সমস্যাটির বিবরণ ও অর্ডার নম্বর দিন যাতে সাহায্য করতে পারি।";
-    } else if (isGujarati) {
-      supportText = "નમસ્તે! હું આપની ટિકિટ સીનિઅર મેનેજરને મોકલી રહ્યો છું, તે પહેલાં જો આપ આપની મુશ્કેલી અને ઓર્ડર નંબર આપો તો ઝડપથી મદદ થઈ શકે.";
-    } else if (isPunjabi) {
-      supportText = "ਸਤਿ ਸ੍ਰੀ ਅਕਾਲ! ਮੈਂ ਤੁਹਾਡਾ ਕੇਸ ਸੀਨੀਅਰ ਮੈਨੇਜਰ ਨੂੰ ਰੈਫਰ ਕਰ ਰਹੀ ਹਾਂ, ਪਰ ਉਦੋਂ ਤੱਕ ਕੀ ਤੁਸੀਂ ਮੈਨੂੰ ਆਪਣਾ ਆਰਡਰ ਨੰਬਰ ਦੱਸ ਸਕਦੇ ਹੋ?";
-    } else {
-      supportText = "Hello! A senior support associate can be looped in, but in the meantime, please let me know your order number or query details so I can attempt to solve this directly for you right away!";
-    }
-  } else {
-    if (isHindiOrHinglish) {
-      supportText = "नमस्ते! वाणीAI कस्टमर केयर टीम में आपका स्वागत है। हम आपके विवरण की जाँच कर रहे हैं और तत्काल समाधान के साथ प्रस्तुत होंगे।";
-    } else if (isTamilOrTanglish) {
-      supportText = "வணக்கம்! வாணிAI வாடிக்கையாளர் சேவைக்கு உங்களை வரவேற்கிறோம். உங்களது கோரிக்கையை நாங்கள் ஆராய்ந்து வருகிறோம்.";
-    } else if (isTelugu) {
-      supportText = "నమస్కారం! వాణిAI కస్టమర్ కేర్ కి స్వాగతం. మీ అభ్యర్థనను మా బృందం తనిఖీ చేస్తోంది, త్వరలోనే పరిష్కరిస్తాము.";
-    } else if (isKannada) {
-      supportText = "ನಮಸ್ತೆ! ವಾಣಿAI ಗ್ರಾಹಕ ಸೇವೆಗೆ ಸುಸ್ವಾಗತ. ನಾವು ನಿಮ್ಮ ಕೋರಿಕೆಯನ್ನು ಪರಿಶೀಲಿಸುತ್ತಿದ್ದು, ಶೀಘ್ರವೇ ಪರಿಹಾರ ಒದಗಿಸಲಿದ್ದೇವೆ.";
-    } else if (isMarathi) {
-      supportText = "नमस्कार! वाणीAI ग्राहक सेवेत आपले स्वागत आहे. आम्ही तुमच्या समस्येचे पुनरावलोकन करत आहोत. लवकरच उपाय देऊ.";
-    } else if (isBengali) {
-      supportText = "নমস্কার! বাণীAI কাস্টমার কেয়ারে আপনাকে স্বাগত। আমরা আপনার বিশদটি দেখছি এবং খুব তাড়াতাড়ি সমাধান করব।";
-    } else if (isGujarati) {
-      supportText = "નમસ્તે! વાણીAI સપોર્ટ ડેસ્ક પર આપનું સ્વાગત છે. અમે આપની સમીક્ષા કરી રહ્યા છીએ, ઝડપથી જવાબ આપીશું.";
-    } else if (isPunjabi) {
-      supportText = "ਸਤਿ ਸ੍ਰੀ ਅਕਾਲ! ਵਾਣੀAI ਸਪੋਰਟ ਡੈਸਕ 'ਤੇ ਤੁਹਾਡਾ ਸੁਆਗਤ ਹੈ। ਅਸੀਂ ਤੁਹਾਡੀ ਬੇਨਤੀ ਦੀ ਜਾਂਚ ਕਰ ਰਹੇ ਹਾਂ ਅਤੇ ਜਲਦੀ ਹੱਲ ਕਰਾਂਗੇ।";
-    } else {
-      supportText = "Hello! Thank you for contacting VaaniAI. Our support desk is reviewing your ticket details now and will provide a personalized resolution instantly.";
-    }
-  }
-
-  suggestions.push({
-    text: supportText,
-    label: `Draft CoPilot Support Response (${language.split(' ')[0]} Match)`,
-    action: 'insert'
-  });
-
-  // 2. Resolve & Close message
-  let resolveText = "";
-  if (isHindiOrHinglish) {
-    resolveText = "धन्यवाद! आपकी समस्या का पूरी तरह से निवारण हो चुका है। अब हम इस सहायता टिकट को हल चिह्नित कर रहे हैं। शुभ दिन!";
-  } else if (isTamilOrTanglish) {
-    resolveText = "நன்றி! உங்கள் பிரச்சனை வெற்றிகரமாக தீர்க்கப்பட்டுவிட்டது. இந்த திக்கெட்டை நாங்கள் இத்துடன் முடித்துக்கொள்கிறோம். நல்ல நாள் அமையட்டும்!";
-  } else if (isTelugu) {
-    resolveText = "ధన్యవాదాలు! మీ సమస్య పూర్తిగా పరిష్కరించబడింది. ఈ సహాయ టిక్కెట్‌ను మేము క్లోజ్ చేస్తున్నాము. మీకు మంచి రోజు అవ్వాలి!";
-  } else if (isKannada) {
-    resolveText = "ಧನ್ಯವಾದಗಳು! ನಿಮ್ಮ ಸಮಸ್ಯೆಯನ್ನು ಯಶಸ್ವಿಯಾಗಿ ಪರಿಹರಿಸಲಾಗಿದ್ದು, ನಾವು ಈ ಟಿಕೆಟ್‌ ಅನ್ನು ಮುಚ್ಚುತ್ತಿದ್ದೇವೆ. ಒಳ್ಳೆಯ ದಿನವಾಗಲಿ!";
-  } else if (isMarathi) {
-    resolveText = "धन्यवाद! आपल्या समस्येचे यशस्वीरीत्या निवारण करण्यात आले आहे. आम्ही हे तिकीट बंद करत आहोत. आपला दिवस शुभ जावो!";
-  } else if (isBengali) {
-    resolveText = "ধন্যবাদ! আপনার समस्याটি সফলভাবে সমাধান করা হয়েছে। আমরা এই টিকিটটি বন্ধ করছি। আপনার দিনটি শুভ হোক!";
-  } else if (isGujarati) {
-    resolveText = "આભાર! આપની સમસ્યાનું સંપૂર્ણ નિરાકરણ થઈ ચૂક્યું છે. હવે અમે આ સપોર્ટ ટિકિટ બંધ કરી રહ્યા છીએ. આપનો દિવસ શુભ રહે!";
-  } else if (isPunjabi) {
-    resolveText = "ਤੁਹਾਡੀ ਸਮੱਸਿਆ ਹੱਲ ਹੋ ਗਈ ਹੈ। ਅਸੀਂ ਹੁਣ ਇਸ ਟਿਕਟ ਨੂੰ ਬੰਦ ਕਰ ਰਹੇ ਹਾਂ। ਧੰਨਵਾਦ!";
-  } else {
-    resolveText = "Understood! The issue is fully resolved and we are marking this support ticket as closed. Thank you for choosing VaaniAI support!";
-  }
-
-  suggestions.push({
-    text: resolveText,
-    label: "Verify & Resolve Ticket",
-    action: 'resolve'
-  });
-
-  return suggestions;
-  */
 };
 
 
@@ -333,7 +149,50 @@ const SubscriptionGate = ({
   );
 };
 
+const marketingTexts = [
+  {
+    title: "12+ Vernacular Indian Dialects",
+    description: "VaaniAI captures regional speech nuance, slang, and code-mixed context in Hindi, Hinglish, and English flawlessly.",
+    badge: "Vernacular Grounding"
+  },
+  {
+    title: "92% AI Agent Automated Handover",
+    description: "Our high-precision grounding patterns allow autonomous chat co-pilots to resolve recurring logistics, refund disputes, and product queries instantly.",
+    badge: "Maximum Efficiency"
+  },
+  {
+    title: "Dynamic Smart SLA Milestones",
+    description: "Set down custom resolution timers that automatically escalate delayed customer inquiries into specialized human support operator dashboards.",
+    badge: "Zero Drop-Offs"
+  },
+  {
+    title: "Compliant PII Data Redaction",
+    description: "The enterprise-grade security middleware instantly filters personal credentials, transaction keys, and bank databases before forwarding API queries.",
+    badge: "Enterprise Security"
+  },
+  {
+    title: "Meta WhatsApp API Handshake",
+    description: "Bring automated customer assistance straight to WhatsApp channels by integrating callback parameters into your production webhooks.",
+    badge: "Omnichannel Growth"
+  }
+];
+
 export default function App() {
+  const [embeddedWidgetMode, setEmbeddedWidgetMode] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const p = new URLSearchParams(window.location.search);
+      return p.get('embeddedWidget') === 'true';
+    }
+    return false;
+  });
+  const [widgetBusinessId] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const p = new URLSearchParams(window.location.search);
+      return p.get('businessId') || '';
+    }
+    return '';
+  });
+
   const [uiLang, setUiLang] = useState<'en' | 'hi'>('en');
   const [showOwnerPassword, setShowOwnerPassword] = useState<boolean>(false);
 
@@ -349,6 +208,23 @@ export default function App() {
   const [authToken, setAuthToken] = useState<string | null>(() => {
     return localStorage.getItem('vaani_logged_token');
   });
+
+  useEffect(() => {
+    if (embeddedWidgetMode && widgetBusinessId) {
+      const fetchWidgetConfig = async () => {
+        try {
+          const res = await window.fetch(`/api/widget/config?businessId=${encodeURIComponent(widgetBusinessId)}`);
+          if (res.ok) {
+            const data = await res.json();
+            setSettings(data);
+          }
+        } catch (e) {
+          console.warn("Failed to retrieve widget config: ", e);
+        }
+      };
+      fetchWidgetConfig();
+    }
+  }, [embeddedWidgetMode, widgetBusinessId]);
 
   // Intercept the default fetch API inside App to enforce secure token-handling & session checks
   const fetch = async (url: RequestInfo | URL, options: RequestInit = {}) => {
@@ -532,6 +408,10 @@ export default function App() {
   const [payingCardHolder, setPayingCardHolder] = useState('');
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
   const [paymentDone, setPaymentDone] = useState(false);
+  const [obBillingInterval, setObBillingInterval] = useState<'monthly' | 'yearly'>('monthly');
+  const [obCheckoutPlan, setObCheckoutPlan] = useState<'PRO' | 'ENTERPRISE'>('PRO');
+  const [paymentError, setPaymentError] = useState<string | null>(null);
+  const [showOnboardingCardModal, setShowOnboardingCardModal] = useState<boolean>(false);
 
   // Completed Feedback Tab Filtering States
   const [feedbackRatingFilter, setFeedbackRatingFilter] = useState<'ALL' | 5 | 4 | 3>('ALL');
@@ -965,13 +845,22 @@ export default function App() {
   const [obValidationErrors, setObValidationErrors] = useState<Record<string, string>>({});
 
   // --- SEGREGATED PORTALS & ONBOARDING EMPLOYEE REGISTRATION STATES ---
-  const [authPortalTab, setAuthPortalTab] = useState<'selection' | 'business_login' | 'business_register' | 'employee_login' | 'forgot_password' | 'reset_password'>('selection');
+  const [authPortalTab, setAuthPortalTab] = useState<'selection' | 'business_login' | 'business_register' | 'employee_login' | 'forgot_password' | 'reset_password' | 'customer_chat'>('selection');
   const [forgotEmail, setForgotEmail] = useState<string>('');
   const [forgotSuccess, setForgotSuccess] = useState<string | null>(null);
   const [forgotSimulatedEmail, setForgotSimulatedEmail] = useState<{ to: string; resetLink: string; token: string } | null>(null);
   const [resetTokenVal, setResetTokenVal] = useState<string>('');
   const [resetNewPassword, setResetNewPassword] = useState<string>('');
   const [resetSuccess, setResetSuccess] = useState<string | null>(null);
+
+  const [marketingSlideIndex, setMarketingSlideIndex] = useState<number>(0);
+
+  useEffect(() => {
+    const intervalId = setInterval(() => {
+      setMarketingSlideIndex(prev => (prev + 1) % marketingTexts.length);
+    }, 4500);
+    return () => clearInterval(intervalId);
+  }, []);
 
   const [ownerBusinessName, setOwnerBusinessName] = useState<string>('');
   const [ownerName, setOwnerName] = useState<string>('');
@@ -1173,6 +1062,8 @@ export default function App() {
   const [playgroundLoading, setPlaygroundLoading] = useState<boolean>(false);
   const [systemKeyStatus, setSystemKeyStatus] = useState<{ gemini: boolean; anthropic: boolean }>({ gemini: false, anthropic: false });
 
+  const [showPlaygroundBubble, setShowPlaygroundBubble] = useState<boolean>(false);
+
   const [settings, setSettings] = useState<{
     companyName: string;
     supportEmail: string;
@@ -1188,9 +1079,23 @@ export default function App() {
     kbReturns?: string;
     kbShipping?: string;
     kbEscalation?: string;
+    
+    // Real-time Database and REST API Integration Settings
+    dbIntegrationType?: 'POSTGRESQL' | 'MYSQL' | 'REST_API' | 'SUPABASE' | 'NONE';
+    dbHost?: string;
+    dbPort?: number;
+    dbUser?: string;
+    dbPassword?: string;
+    dbName?: string;
+    dbSsl?: boolean;
+    dbQueryTemplate?: string;
+    apiUrl?: string;
+    apiAuthHeader?: string;
+    apiAuthValue?: string;
+    apiOrderPath?: string;
   }>({
-    companyName: "NoshBerry Corp",
-    supportEmail: "support@noshberry.com",
+    companyName: "XYZ Corp",
+    supportEmail: "support@xyz.com",
     slaMinutes: 10,
     botEnabled: true,
     defaultGreeting: "Welcome to our Support Assist! How can we help you today with your order?",
@@ -1202,7 +1107,19 @@ export default function App() {
     kbBusiness: "",
     kbReturns: "",
     kbShipping: "",
-    kbEscalation: ""
+    kbEscalation: "",
+    dbIntegrationType: 'NONE',
+    dbHost: "",
+    dbPort: 5432,
+    dbUser: "",
+    dbPassword: "",
+    dbName: "",
+    dbSsl: false,
+    dbQueryTemplate: "SELECT * FROM orders WHERE order_id = $1 LIMIT 1;",
+    apiUrl: "",
+    apiAuthHeader: "Authorization",
+    apiAuthValue: "",
+    apiOrderPath: "/orders/{{orderId}}"
   });
 
   const [settingsSaving, setSettingsSaving] = useState<boolean>(false);
@@ -2093,7 +2010,34 @@ export default function App() {
     return t.status !== 'RESOLVED' && time > 0 && time <= 300000;
   }).length;
 
+  if (embeddedWidgetMode) {
+    return (
+      <div className="min-h-screen bg-[#07080c] text-gray-200 font-sans flex flex-col relative overflow-hidden">
+        <CustomerPortal
+          onBack={() => {}}
+          tickets={tickets}
+          onTicketsChange={setTickets}
+          settings={settings}
+          isWidget={true}
+        />
+      </div>
+    );
+  }
+
   if (!employee) {
+    if (authPortalTab === 'customer_chat') {
+      return (
+        <div className="min-h-screen bg-[#07080c] text-gray-200 font-sans flex flex-col relative overflow-hidden">
+          <CustomerPortal
+            onBack={() => setAuthPortalTab('selection')}
+            tickets={tickets}
+            onTicketsChange={setTickets}
+            settings={settings}
+          />
+        </div>
+      );
+    }
+
     return (
       <div className="min-h-screen bg-[#07080c] text-[#f2ede4] font-sans flex flex-col justify-center items-center p-4 relative overflow-hidden select-none">
         {/* Glow decorative orbs under the hood */}
@@ -2578,13 +2522,13 @@ export default function App() {
                         <span>🛠️ Ethereal Sandbox Dispatch</span>
                         <span className="text-[8px] bg-amber-500/10 text-amber-300 px-1.5 py-0.2 rounded font-bold">SMTP Simulator</span>
                       </div>
-                      <p className="text-[9.5px] text-gray-400 font-mono leading-relaxed">
+                      <p className="text-[9.5px] text-gray-500 font-mono leading-relaxed">
                         To simplify sandbox preview, toggle the verification deep-link or use the token code on the reset workbench tab:
                       </p>
-                      <div className="bg-black/40 border border-white/[0.04] p-3 rounded-xl font-mono text-[10px] text-amber-300 space-y-2">
+                      <div className="bg-black/45 border border-white/[0.04] p-3 rounded-xl font-mono text-[10px] text-amber-300 space-y-2">
                         <div>
-                          <span className="text-gray-500 block uppercase text-[8px] tracking-wider mb-0.5">Security Link:</span>
-                          <a 
+                          <span className="text-gray-600 block uppercase text-[8px] tracking-widest mb-0.5">Security Link:</span>
+                          <a
                             href={forgotSimulatedEmail.resetLink}
                             onClick={(e) => {
                               e.preventDefault();
@@ -2735,40 +2679,101 @@ export default function App() {
                 </form>
               )}
 
-              {/* Dev Demo Mode Rapid Login Account Grid */}
-              <div className="border-t border-white/[0.03] pt-4 mt-4">
-                <span className="text-[10px] font-mono text-gray-500 uppercase tracking-widest block mb-2 text-center text-[9px]">
-                  🛠️ WORKBENCH SEEDED CO-PILOTS
+              {/* Cycling VaaniAI Marketing / Solution Insights Slideshow */}
+              <div className="border-t border-white/[0.03] pt-4.5 mt-5">
+                <span className="text-[9px] font-mono text-gray-500 uppercase tracking-widest block mb-2.5 text-center select-none">
+                  💡 SOLUTION PLATFORM INSIGHTS
                 </span>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <button
-                    type="button"
-                    onClick={() => handleQuickLogin('harshad@vaani.ai', 'password123')}
-                    className="p-3 bg-[#12141c] hover:bg-[#161922] active:bg-orange-500/5 rounded-xl border border-white/[0.03] hover:border-orange-500/20 text-left transition group cursor-pointer select-none"
-                  >
-                    <div className="text-[11px] font-bold text-orange-400 font-mono transition group-hover:text-orange-300">Harshad (Lead)</div>
-                    <div className="text-[9.5px] text-gray-450 mt-0.5 font-sans">Senior Operations</div>
-                    <div className="text-[8px] font-mono text-gray-500 mt-1 truncate">harshad@vaani.ai</div>
-                    <div className="text-[8.5px] font-mono text-gray-600 mt-0.5 uppercase">Instant Auth</div>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleQuickLogin('ashish@vaani.ai', 'vaani2026')}
-                    className="p-3 bg-[#12141c] hover:bg-[#161922] active:bg-orange-500/5 rounded-xl border border-white/[0.03] hover:border-orange-500/20 text-left transition group cursor-pointer select-none"
-                  >
-                    <div className="text-[11px] font-bold text-orange-400 font-mono transition group-hover:text-orange-300">Ashish Sharma</div>
-                    <div className="text-[9.5px] text-gray-450 mt-0.5 font-sans">Specialist seat</div>
-                    <div className="text-[8px] font-mono text-gray-500 mt-1 truncate">ashish@vaani.ai</div>
-                    <div className="text-[8.5px] font-mono text-gray-600 mt-0.5 uppercase">Instant Auth</div>
-                  </button>
+                
+                <div className="bg-[#12141c]/50 border border-white/[0.03] hover:border-orange-500/10 rounded-xl p-4.5 min-h-[145px] flex flex-col justify-between relative overflow-hidden select-none transition-colors duration-300">
+                  {/* Subtle decorative background laser shine */}
+                  <div className="absolute -right-20 -bottom-20 w-48 h-48 bg-orange-500/5 blur-3xl rounded-full pointer-events-none" />
+                  
+                  <AnimatePresence mode="wait">
+                    <motion.div
+                      key={marketingSlideIndex}
+                      initial={{ opacity: 0, y: 12 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -12 }}
+                      transition={{ duration: 0.38, ease: "easeInOut" }}
+                      className="space-y-2"
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-bold font-mono text-orange-400 uppercase tracking-wider">
+                          {marketingTexts[marketingSlideIndex].title}
+                        </span>
+                        <span className="text-[8px] font-mono bg-white/[0.03] text-gray-400 px-2 py-0.5 rounded border border-white/[0.02]">
+                          {marketingTexts[marketingSlideIndex].badge}
+                        </span>
+                      </div>
+                      <p className="text-[10.5px] text-gray-400 font-sans leading-relaxed">
+                        {marketingTexts[marketingSlideIndex].description}
+                      </p>
+                    </motion.div>
+                  </AnimatePresence>
+
+                  {/* Indicators / Progress bars */}
+                  <div className="flex justify-center gap-1.8 mt-4 pt-1 z-10 pointer-events-auto">
+                    {marketingTexts.map((_, idx) => (
+                      <button
+                        key={idx}
+                        type="button"
+                        onClick={() => setMarketingSlideIndex(idx)}
+                        className={`h-1.5 rounded-full transition-all duration-300 cursor-pointer ${
+                          idx === marketingSlideIndex 
+                            ? "w-4.5 bg-orange-500" 
+                            : "w-1.5 bg-gray-700/80 hover:bg-gray-600"
+                        }`}
+                        title={`Go to slide ${idx + 1}`}
+                      />
+                    ))}
+                  </div>
                 </div>
               </div>
+
+
                 </>
               )}
 
             </div>
           )}
         </div>
+
+        {/* Dynamic Support Floating Widget Button */}
+        {(authPortalTab === 'selection' || authPortalTab === 'business_register' || authPortalTab === 'employee_login') && (
+          <div className="fixed bottom-6 right-6 z-50">
+            <motion.div
+              initial={{ opacity: 0, x: 50, scale: 0.7 }}
+              animate={{ opacity: 1, x: 0, scale: 1 }}
+              transition={{ type: 'spring', stiffness: 220, damping: 20, delay: 0.3 }}
+            >
+              <motion.button
+                type="button"
+                onClick={() => { setAuthPortalTab('customer_chat'); setAuthError(null); }}
+                animate={{
+                  scale: [1, 1.035, 1],
+                  boxShadow: [
+                    "0 6px 20px rgba(249,115,22,0.3)",
+                    "0 12px 32px rgba(249,115,22,0.55)",
+                    "0 6px 20px rgba(249,115,22,0.3)"
+                  ]
+                }}
+                transition={{
+                  duration: 4,
+                  repeat: Infinity,
+                  repeatType: "mirror",
+                  ease: "easeInOut"
+                }}
+                whileHover={{ scale: 1.06 }}
+                whileTap={{ scale: 0.96 }}
+                className="flex items-center gap-2.5 px-5.5 py-4 cursor-pointer bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white rounded-full border border-orange-400/20 font-mono text-xs font-extrabold select-none active:scale-95 group relative"
+              >
+                <MessageSquare size={16} className="text-white" />
+                <span>Chat with us</span>
+              </motion.button>
+            </motion.div>
+          </div>
+        )}
       </div>
     );
   }
@@ -2853,7 +2858,7 @@ export default function App() {
         return;
       }
 
-      // Compile settings & save to database
+      // Compile settings & save to database (keep isTrained false, because they must buy subscription in step 6)
       setSettingsSaving(true);
       
       const compiledKB = [
@@ -2884,12 +2889,13 @@ export default function App() {
             defaultGreeting: `Namaste! Welcome to ${settings.companyName} customer support desktop. How can we help you solve your order or transaction issues today?`,
             brandKnowledge: compiledKB,
             aiPolicyInstructions: settings.aiPolicyInstructions || "1. Mask client numbers and transaction ID parameters.\n2. Respect multilingual code-mixed vernacular terms.",
-            isTrained: true
+            isTrained: false // Changed from true to false! Setup is not fully complete until billing is settled.
           })
         });
         if (res.ok) {
           const data = await res.json();
           setSettings(data.settings);
+          setObStep(6); // Transition to Step 6 (Billing & Subscription)
         }
       } catch (err) {
         console.error("Failed to compile configurations: ", err);
@@ -2927,7 +2933,8 @@ export default function App() {
                 { s: 2, label: "PERSONALITY" },
                 { s: 3, label: "SECURITY" },
                 { s: 4, label: "KNOWLEDGE" },
-                { s: 5, label: "SIMULATOR" }
+                { s: 5, label: "SIMULATOR" },
+                { s: 6, label: "BILLING" }
               ].map((stepObj) => (
                 <button
                   key={stepObj.s}
@@ -2968,7 +2975,7 @@ export default function App() {
             <div className="relative w-full h-1 bg-white/[0.02] rounded-full mt-3.5 px-3">
               <div 
                 className="absolute top-0 left-0 h-full bg-gradient-to-r from-orange-500 to-amber-400 rounded-full transition-all duration-500 ease-out"
-                style={{ width: `${((obStep - 1) / 4) * 100}%` }}
+                style={{ width: `${((obStep - 1) / 5) * 100}%` }}
               />
             </div>
           </div>
@@ -2984,6 +2991,7 @@ export default function App() {
                 {obStep === 3 && <Lock size={14} />}
                 {obStep === 4 && <Database size={14} />}
                 {obStep === 5 && <Bot size={14} />}
+                {obStep === 6 && <CreditCard size={14} />}
               </div>
               <div>
                 <h4 className="text-[11.5px] font-mono tracking-wider font-bold uppercase text-gray-300">
@@ -2992,6 +3000,7 @@ export default function App() {
                   {obStep === 3 && "PII Protection & Security Shielding"}
                   {obStep === 4 && "Connecting Your Corporate Knowledge Base"}
                   {obStep === 5 && "WhatsApp-Style Conversational Sandbox"}
+                  {obStep === 6 && "SaaS Subscription & Billing Setup"}
                 </h4>
                 <p className="text-[11px] text-gray-400 mt-1 leading-relaxed">
                   {obStep === 1 && "To design tone accents and ground AI rules properly, we categorize business models and match specific operating layouts by support channels."}
@@ -2999,6 +3008,7 @@ export default function App() {
                   {obStep === 3 && "SaaS products operate inside real client bounds. Toggles mask user identity items, keeping operations safe and GDPR/SLA compliant."}
                   {obStep === 4 && "Feed brand context documents. Real grounding prevents the AI from halluncinatiing pricing details or shipping dates."}
                   {obStep === 5 && "Interact with the trained agent model in real-time. Review identified intent classes, computed safety status, and performance."}
+                  {obStep === 6 && "To unlock the full power of your vernacular agent, select your subscription plan and authorize a secure card payment. Once authorized, your live workbench will activate instantly."}
                 </p>
               </div>
             </div>
@@ -3675,6 +3685,7 @@ export default function App() {
                         "Hey coupon issue haiWELCOME10 check kijiye"
                       ].map((pillText) => (
                         <button
+                          key={pillText}
                           type="button"
                           disabled={obSimLoading}
                           onClick={() => {
@@ -3842,6 +3853,412 @@ export default function App() {
                 </div>
               )}
 
+              {/* STEP 6: SUBSCRIPTION & SAAS BILLING GATEWAY */}
+              {obStep === 6 && (
+                <div className="space-y-6">
+                  {/* Top Header Row with Billed interval Toggle */}
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white/[0.015] border border-white/[0.03] p-4 rounded-xl">
+                    <div>
+                      <h4 className="text-xs font-bold font-mono tracking-wider text-orange-400 capitalize">Select Individual Subscription Plan</h4>
+                      <p className="text-[10px] text-gray-400 mt-1 leading-normal font-sans">Each business workspace is purchased individually; billing is non-transferable.</p>
+                    </div>
+
+                    <div className="inline-flex items-center gap-1.5 p-1 bg-white/[0.02] border border-white/[0.05] rounded-xl shrink-0 self-start sm:self-auto">
+                      <button
+                        type="button"
+                        onClick={() => setObBillingInterval('monthly')}
+                        className={`px-3 py-1.5 text-[10px] font-bold font-mono rounded-lg transition-all cursor-pointer ${
+                          obBillingInterval === 'monthly' 
+                            ? 'bg-orange-500 text-[#07080c] shadow shadow-orange-500/20' 
+                            : 'text-gray-400 hover:text-gray-200 bg-transparent'
+                        }`}
+                      >
+                        Billed Monthly
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setObBillingInterval('yearly')}
+                        className={`px-3 py-1.5 text-[10px] font-bold font-mono rounded-lg transition-all flex items-center gap-1 cursor-pointer ${
+                          obBillingInterval === 'yearly' 
+                            ? 'bg-orange-500 text-[#07080c] shadow shadow-orange-500/20' 
+                            : 'text-gray-400 hover:text-gray-200 bg-transparent'
+                        }`}
+                      >
+                        <span>Annually</span>
+                        <span className={`text-[8px] font-bold px-1 py-0.5 rounded ${obBillingInterval === 'yearly' ? 'bg-[#07080c]/20 text-[#07080c]' : 'bg-emerald-500/15 text-emerald-400'}`}>
+                          -20%
+                        </span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Two Main Plan Comparison Selectors */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                    {/* PRO PLAN OPTION CARD */}
+                    <div 
+                      onClick={() => {
+                        setObCheckoutPlan('PRO');
+                        setPaymentError(null);
+                        setPaymentDone(false);
+                        setShowOnboardingCardModal(true);
+                      }}
+                      className={`relative bg-[#10111a] rounded-xl p-5 border transition-all cursor-pointer flex flex-col justify-between space-y-4 ${
+                        obCheckoutPlan === 'PRO' 
+                          ? 'border-orange-500 bg-orange-500/[0.02] shadow-[0_0_20px_rgba(249,115,22,0.06)]' 
+                          : 'border-white/[0.04] hover:border-white/[0.08]'
+                      }`}
+                    >
+                      <div className="space-y-3 ms-0 me-0">
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <span className="text-[9px] font-mono text-gray-500 uppercase tracking-widest">Growth Plan</span>
+                            <h5 className="text-xs font-bold text-gray-200 mt-0.5 font-sans">Professional Tier</h5>
+                          </div>
+                          {obCheckoutPlan === 'PRO' && (
+                            <span className="text-[9px] font-mono bg-orange-500/15 border border-orange-500/20 text-orange-400 px-2 py-0.5 rounded font-bold uppercase">SELECTED</span>
+                          )}
+                        </div>
+
+                        <div className="flex items-baseline gap-1 font-sans">
+                          <span className="text-2xl font-bold text-white font-mono">
+                            {obBillingInterval === 'yearly' ? '$71' : '$89'}
+                          </span>
+                          <span className="text-[10px] text-gray-500 font-mono">/ mo</span>
+                        </div>
+
+                        <ul className="space-y-2 text-[10.5px] text-gray-400 border-t border-white/[0.03] pt-3 leading-relaxed">
+                          <li className="flex items-center gap-1.5 font-sans">
+                            <CheckCircle2 size={11} className="text-orange-500 shrink-0" />
+                            <span>Up to 50,000 monthly queries</span>
+                          </li>
+                          <li className="flex items-center gap-1.5 font-sans">
+                            <CheckCircle2 size={11} className="text-orange-500 shrink-0" />
+                            <span>5 active client service seats</span>
+                          </li>
+                          <li className="flex items-center gap-1.5 font-sans">
+                            <CheckCircle2 size={11} className="text-orange-500 shrink-0" />
+                            <span>10 grounding knowledge indexes</span>
+                          </li>
+                          <li className="flex items-center gap-1.5 font-sans">
+                            <CheckCircle2 size={11} className="text-orange-500 shrink-0" />
+                            <span>WhatsApp Webhook & SDK Access</span>
+                          </li>
+                        </ul>
+
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setObCheckoutPlan('PRO');
+                            setPaymentError(null);
+                            setPaymentDone(false);
+                            setShowOnboardingCardModal(true);
+                          }}
+                          className="w-full mt-2 py-2 text-xs font-semibold rounded-lg bg-orange-500 hover:bg-orange-600 text-[#07080c] transition duration-200 cursor-pointer text-center font-mono uppercase"
+                        >
+                          Select Pro Growth Plan
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* ENTERPRISE PLAN OPTION CARD */}
+                    <div 
+                      onClick={() => {
+                        setObCheckoutPlan('ENTERPRISE');
+                        setPaymentError(null);
+                        setPaymentDone(false);
+                        setShowOnboardingCardModal(true);
+                      }}
+                      className={`relative bg-[#10111a] rounded-xl p-5 border transition-all cursor-pointer flex flex-col justify-between space-y-4 ${
+                        obCheckoutPlan === 'ENTERPRISE' 
+                          ? 'border-orange-500 bg-orange-500/[0.02] shadow-[0_0_20px_rgba(249,115,22,0.06)]' 
+                          : 'border-white/[0.04] hover:border-white/[0.08]'
+                      }`}
+                    >
+                      <div className="space-y-3 ms-0 me-0">
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <span className="text-[9px] font-mono text-gray-500 uppercase tracking-widest">Enterprise Scale</span>
+                            <h5 className="text-xs font-bold text-gray-200 mt-0.5 font-sans">Custom Enterprise Tier</h5>
+                          </div>
+                          {obCheckoutPlan === 'ENTERPRISE' && (
+                            <span className="text-[9px] font-mono bg-orange-500/15 border border-orange-500/20 text-orange-400 px-2 py-0.5 rounded font-bold uppercase">SELECTED</span>
+                          )}
+                        </div>
+
+                        <div className="flex items-baseline gap-1 font-sans">
+                          <span className="text-2xl font-bold text-white font-mono">
+                            {obBillingInterval === 'yearly' ? '$199' : '$249'}
+                          </span>
+                          <span className="text-[10px] text-gray-500 font-mono">/ mo</span>
+                        </div>
+
+                        <ul className="space-y-2 text-[10.5px] text-gray-400 border-t border-white/[0.03] pt-3 leading-relaxed">
+                          <li className="flex items-center gap-1.5 font-sans">
+                            <CheckCircle2 size={11} className="text-orange-500 shrink-0" />
+                            <span>Up to 500,000 monthly queries</span>
+                          </li>
+                          <li className="flex items-center gap-1.5 font-sans">
+                            <CheckCircle2 size={11} className="text-orange-500 shrink-0" />
+                            <span>25 active customer service seats</span>
+                          </li>
+                          <li className="flex items-center gap-1.5 font-sans">
+                            <CheckCircle2 size={11} className="text-orange-500 shrink-0" />
+                            <span>40 grounding knowledge indexes</span>
+                          </li>
+                          <li className="flex items-center gap-1.5 font-sans">
+                            <CheckCircle2 size={11} className="text-orange-500 shrink-0" />
+                            <span>Full 24/7 dedicated service level SLA</span>
+                          </li>
+                        </ul>
+
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setObCheckoutPlan('ENTERPRISE');
+                            setPaymentError(null);
+                            setPaymentDone(false);
+                            setShowOnboardingCardModal(true);
+                          }}
+                          className="w-full mt-2 py-2 text-xs font-semibold rounded-lg bg-orange-500 hover:bg-orange-600 text-[#07080c] transition duration-200 cursor-pointer text-center font-mono uppercase"
+                        >
+                          Select Enterprise Scale
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Checkout Modal Payment Ingress Pop-up */}
+                  <AnimatePresence>
+                    {showOnboardingCardModal && (
+                      <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+                        
+                        {/* Dark Backdrop with blur */}
+                        <motion.div 
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 1 }}
+                          exit={{ opacity: 0 }}
+                          onClick={() => {
+                            if (!isProcessingPayment) setShowOnboardingCardModal(false);
+                          }}
+                          className="fixed inset-0 bg-[#040508]/85 backdrop-blur-md"
+                        />
+
+                        {/* Modal Body */}
+                        <motion.div
+                          initial={{ opacity: 0, scale: 0.95, y: 12 }}
+                          animate={{ opacity: 1, scale: 1, y: 0 }}
+                          exit={{ opacity: 0, scale: 0.95, y: 12 }}
+                          className="bg-[#0f1016] border border-white/[0.06] rounded-2xl p-6 w-full max-w-2xl relative z-10 space-y-6 shadow-2xl overflow-y-auto max-h-[90vh]"
+                        >
+                          <div className="flex justify-between items-start">
+                            <div>
+                              <h3 className="text-sm font-bold text-white flex items-center gap-1.5 font-sans">
+                                <Lock size={14} className="text-orange-400" />
+                                <span>SaaS Secure Onboarding Checkout</span>
+                              </h3>
+                              <p className="text-[10px] text-gray-500 font-mono mt-0.5 uppercase tracking-widest">
+                                SSL SECURED GATEWAY INTEGRATION • PLAN: {obCheckoutPlan === 'PRO' ? 'PRO TIER' : 'ENTERPRISE TIER'}
+                              </p>
+                            </div>
+                            
+                            <button 
+                              type="button"
+                              onClick={() => {
+                                if (!isProcessingPayment) setShowOnboardingCardModal(false);
+                              }}
+                              disabled={isProcessingPayment}
+                              className="p-1 rounded bg-white/[0.02] hover:bg-white/[0.08] text-gray-400 hover:text-white transition cursor-pointer disabled:opacity-50"
+                            >
+                              <X size={14} />
+                            </button>
+                          </div>
+
+                          <div className="bg-[#10111a] border border-white/[0.04] p-5 rounded-xl grid grid-cols-1 md:grid-cols-12 gap-5 items-center">
+                            
+                            {/* Left side: Virtual Credit Card view (5 cols) */}
+                            <div className="md:col-span-5 relative bg-gradient-to-tr from-[#ea580c] to-[#d97706] p-5 rounded-xl text-white space-y-6 shadow-xl h-44 overflow-hidden border border-white/[0.1] flex flex-col justify-between select-none">
+                              <div className="absolute top-10 right-0 w-32 h-32 bg-white/5 rounded-full filter blur-xl pointer-events-none" />
+                              
+                              <div className="flex justify-between items-center relative z-10">
+                                <span className="text-[9px] font-mono uppercase tracking-widest font-bold text-white/80">
+                                  {settings?.companyName || "VaaniAI"} WORKSPACE LICENSE CARD
+                                </span>
+                                <CreditCard size={18} className="text-white opacity-90" />
+                              </div>
+
+                              <div className="space-y-1 relative z-10">
+                                <div className="text-sm font-mono tracking-widest font-semibold text-white">
+                                  {payingCardNumber ? payingCardNumber : '••••  ••••  ••••  ••••'}
+                                </div>
+                                <div className="flex justify-between text-[10px] font-mono text-white/70">
+                                  <span>{payingCardHolder ? payingCardHolder.toUpperCase() : 'SURNAME NAME'}</span>
+                                  <span>{payingCardExpiry ? payingCardExpiry : 'MM/YY'}</span>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Right side: Input text fields & Authorization button (7 cols) */}
+                            <div className="md:col-span-7 space-y-4">
+                              
+                              {paymentError && (
+                                <div className="p-3 bg-rose-500/10 border border-rose-500/15 rounded-lg text-rose-450 text-[11px] leading-relaxed font-sans text-left">
+                                  {paymentError}
+                                </div>
+                              )}
+
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-left">
+                                <div className="space-y-1">
+                                  <label className="text-[9px] font-mono text-gray-400 uppercase tracking-wider block">Cardholder Full Name</label>
+                                  <input 
+                                    type="text"
+                                    required={showOnboardingCardModal}
+                                    value={payingCardHolder}
+                                    onChange={(e) => setPayingCardHolder(e.target.value)}
+                                    placeholder="e.g. HARSHAD PHADTARE"
+                                    className="w-full h-9 px-3 text-xs rounded-lg border border-white/[0.05] bg-black/40 text-gray-200 placeholder-gray-600 focus:outline-none focus:border-orange-500 transition font-sans"
+                                  />
+                                </div>
+
+                                <div className="space-y-1">
+                                  <label className="text-[9px] font-mono text-gray-400 uppercase tracking-wider block">Card Number</label>
+                                  <input 
+                                    type="text"
+                                    maxLength={19}
+                                    required={showOnboardingCardModal}
+                                    value={payingCardNumber}
+                                    onChange={(e) => {
+                                      let raw = e.target.value.replace(/\s?/g, '').replace(/\D/g, '');
+                                      let formatted = '';
+                                      for (let i = 0; i < raw.length; i++) {
+                                        if (i > 0 && i % 4 === 0) formatted += '  ';
+                                        formatted += raw[i];
+                                      }
+                                      setPayingCardNumber(formatted);
+                                    }}
+                                    placeholder="4821  ••••  ••••  ••••"
+                                    className="w-full h-9 px-3 text-xs rounded-lg border border-white/[0.05] bg-black/40 text-gray-200 placeholder-gray-650 focus:outline-none focus:border-orange-500 transition font-mono"
+                                  />
+                                </div>
+                              </div>
+
+                              <div className="grid grid-cols-2 gap-4 text-left">
+                                <div className="space-y-1">
+                                  <label className="text-[9px] font-mono text-gray-400 uppercase tracking-wider block">Expiration</label>
+                                  <input 
+                                    type="text"
+                                    required={showOnboardingCardModal}
+                                    maxLength={5}
+                                    placeholder="MM/YY"
+                                    value={payingCardExpiry}
+                                    onChange={(e) => {
+                                      let raw = e.target.value.replace(/\//g, '').replace(/\D/g, '');
+                                      if (raw.length > 2) {
+                                        setPayingCardExpiry(raw.slice(0, 2) + '/' + raw.slice(2, 4));
+                                      } else {
+                                        setPayingCardExpiry(raw);
+                                      }
+                                    }}
+                                    className="w-full h-9 px-3 text-xs rounded-lg border border-white/[0.05] bg-black/40 text-gray-200 placeholder-gray-650 focus:outline-none focus:border-orange-500 transition font-mono"
+                                  />
+                                </div>
+
+                                <div className="space-y-1">
+                                  <label className="text-[9px] font-mono text-gray-400 uppercase tracking-wider block">CVC</label>
+                                  <input 
+                                    type="password"
+                                    required={showOnboardingCardModal}
+                                    maxLength={3}
+                                    placeholder="•••"
+                                    value={payingCardCvc}
+                                    onChange={(e) => setPayingCardCvc(e.target.value.replace(/\D/g, ''))}
+                                    className="w-full h-9 px-3 text-xs rounded-lg border border-white/[0.05] bg-black/40 text-gray-200 placeholder-gray-650 focus:outline-none focus:border-orange-500 transition font-mono"
+                                  />
+                                </div>
+                              </div>
+
+                              {/* Payment submit action trigger button */}
+                              <div className="pt-2">
+                                <button
+                                  type="button"
+                                  disabled={isProcessingPayment}
+                                  onClick={async () => {
+                                    if (!payingCardHolder.trim() || !payingCardNumber.trim() || !payingCardExpiry.trim() || !payingCardCvc.trim()) {
+                                      setPaymentError("Please provide all card registration details securely to finalize your plan.");
+                                      return;
+                                    }
+                                    setIsProcessingPayment(true);
+                                    setPaymentError(null);
+                                    try {
+                                      const token = localStorage.getItem('vaani_logged_token') || authToken;
+                                      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+                                      if (token) {
+                                        headers['Authorization'] = `Bearer ${token}`;
+                                      }
+                                      // POST purchase billing details
+                                      const purchaseRes = await fetch('/api/subscription/purchase', {
+                                        method: 'POST',
+                                        headers,
+                                        body: JSON.stringify({
+                                          tier: obCheckoutPlan,
+                                          plan: obBillingInterval,
+                                          cardHolder: payingCardHolder,
+                                          cardNumber: payingCardNumber
+                                        })
+                                      });
+                                      if (!purchaseRes.ok) {
+                                        const purchaseErrJson = await purchaseRes.json();
+                                        throw new Error(purchaseErrJson.error || "SaaS processing engine refused connection. Try another card.");
+                                      }
+
+                                      // Complete training mark configuration to open workbench
+                                      const settingsRes = await fetch('/api/settings', {
+                                        method: 'POST',
+                                        headers,
+                                        body: JSON.stringify({
+                                          ...settings,
+                                          isTrained: true // Finalize Setup!
+                                        })
+                                      });
+                                      
+                                      if (settingsRes.ok) {
+                                        const updatedSetData = await settingsRes.json();
+                                        setSettings(updatedSetData.settings);
+                                        setSubscriptionTier(obCheckoutPlan);
+                                        setPaymentDone(true);
+                                        setShowOnboardingCardModal(false); // Close Modal on success!
+                                      } else {
+                                        throw new Error("Subscription authorized, but workbench routing failed. Try again.");
+                                      }
+                                    } catch (paymentErr: any) {
+                                      setPaymentError(paymentErr.message || "Card authentication failed.");
+                                    } finally {
+                                      setIsProcessingPayment(false);
+                                    }
+                                  }}
+                                  className="w-full h-10 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 transition text-[#07080c] font-bold text-xs font-mono uppercase rounded-xl flex items-center justify-center gap-2 cursor-pointer shadow-lg active:scale-98 disabled:opacity-50"
+                                >
+                                  {isProcessingPayment ? (
+                                    <span>Authorizing Secure Gateway...</span>
+                                  ) : (
+                                    <>
+                                      <Sparkles size={13} className="shrink-0" />
+                                      <span>Authorize Card & Activate Workbench ✓</span>
+                                    </>
+                                  )}
+                                </button>
+                              </div>
+
+                            </div>
+                          </div>
+                        </motion.div>
+                      </div>
+                    )}
+                  </AnimatePresence>
+                </div>
+              )}
+
               {/* Step navigations buttons */}
               <div className="pt-4 flex justify-between items-center border-t border-white/[0.04]">
                 {obStep > 1 ? (
@@ -3863,14 +4280,17 @@ export default function App() {
                   >
                     <span>Next step</span> →
                   </button>
-                ) : (
+                ) : obStep === 5 ? (
                   <button
                     type="submit"
                     disabled={settingsSaving}
                     className="bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-[#07080c] font-bold text-xs font-mono px-6 py-2.5 rounded-xl transition-all shadow-lg active:scale-95 cursor-pointer flex items-center gap-2 border border-emerald-400/20 shadow-emerald-500/10"
                   >
-                    <span>{settingsSaving ? 'Grounding CRM Workspace...' : 'Complete & Open Workbench ✓'}</span>
+                    <span>{settingsSaving ? 'Saving Configurations...' : 'Compile Rules & Proceed to Billing →'}</span>
                   </button>
+                ) : (
+                  // Step 6 has its own inline secure purchase button block
+                  <div />
                 )}
               </div>
               
@@ -4457,6 +4877,8 @@ export default function App() {
                   setSettingsSaveStatus={setSettingsSaveStatus}
                   fetchSettings={fetchSettings}
                   uiLang={uiLang}
+                  showPlaygroundBubble={showPlaygroundBubble}
+                  setShowPlaygroundBubble={setShowPlaygroundBubble}
                 />
               </div>
             )}
@@ -4470,6 +4892,7 @@ export default function App() {
                   uiLang={uiLang}
                   subscriptionTier={subscriptionTier}
                   setSubscriptionTier={setSubscriptionTier}
+                  tickets={tickets}
                 />
               </div>
             )}
@@ -4792,6 +5215,8 @@ export default function App() {
           </div>
         )}
       </AnimatePresence>
+
+
     </div>
   );
 }

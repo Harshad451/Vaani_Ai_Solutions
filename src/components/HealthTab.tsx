@@ -171,7 +171,7 @@ export function HealthTab({ tickets }: HealthTabProps) {
                   <span>Vernacular Sync Warning</span>
                 </h4>
                 <p className="text-gray-400 mt-1 text-[11px] leading-relaxed">
-                  A slight uptick in transliterated mixes language mixes (Hinglish/Tamil) in Apparel checkouts may require manual overview releases.
+                  A slight uptick in transliterated mixes language mixes (Hinglish/English) in Apparel checkouts may require manual overview releases.
                 </p>
               </div>
             </div>

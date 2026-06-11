@@ -26,6 +26,7 @@ export interface Order {
   cost: number;
   carrier?: string;
   estimatedDelivery?: string;
+  rawRecord?: Record<string, any>;
 }
 
 export interface Ticket {
@@ -49,9 +50,12 @@ export interface Ticket {
   copilotSuggestion?: string;
   orderId?: string;
   orderDetail?: Order;
+  orderIdInvalid?: boolean;
+  orderNameMismatch?: boolean;
   channel?: 'WHATSAPP' | 'WEB' | 'EMAIL' | 'SMS';
   languagePreference?: string;
   awaitingLanguageSelection?: boolean;
+  awaitingOrderId?: boolean;
   customerEmail?: string;
   resolvedEmailPreview?: {
     subject: string;

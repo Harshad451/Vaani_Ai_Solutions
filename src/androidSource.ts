@@ -361,7 +361,7 @@ fun ChatScreen(viewModel: ChatViewModel = viewModel()) {
                 title = {
                     Column {
                         Text(
-                            text = "NoshBerry Support Engine",
+                            text = "XYZ Support Center",
                             fontSize = 17.sp,
                             fontWeight = FontWeight.Bold,
                             color = Color(0xFFF1EDE6)
@@ -449,7 +449,7 @@ fun ChatScreen(viewModel: ChatViewModel = viewModel()) {
                         fontSize = 15.sp
                     )
                     Text(
-                        text = "Send a message in your language (e.g. Hindi, Tamil, Hinglish)",
+                        text = "Send a message in your language (e.g. Hindi, English, Hinglish)",
                         color = Color(0xFF5A5865),
                         fontSize = 12.sp,
                         modifier = Modifier.padding(top = 4.dp)

@@ -531,6 +531,17 @@ export function InboxTab({
                           No Linked Order
                         </span>
                       )}
+
+                      {settings?.dbIntegrationType && settings.dbIntegrationType !== 'NONE' ? (
+                        <span className="text-[9px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded-md font-mono font-bold flex items-center gap-1 shrink-0" title={`Live API/Database connected via ${settings.dbIntegrationType}`}>
+                          <span className="w-1 h-1 rounded-full bg-emerald-400 animate-ping shrink-0" />
+                          <span>{settings.dbIntegrationType} Live Connected</span>
+                        </span>
+                      ) : (
+                        <span className="text-[9px] bg-white/5 text-gray-400 border border-white/[0.05] px-2 py-0.5 rounded-md font-mono shrink-0">
+                          Offline Simulation Mode
+                        </span>
+                      )}
                     </div>
                     <p className="text-[11px] text-gray-400 font-sans mt-0.5">
                       {activeTicket.orderDetail 
@@ -708,6 +719,19 @@ export function InboxTab({
                       <p className="text-[10px] text-gray-505 max-w-sm mt-1 leading-relaxed">
                         The customer hasn't provided their registered order ID in the active chat. You can wait for automatic AI recognition, or manually assign one below to review the purchase logs.
                       </p>
+
+                      {activeTicket.orderIdInvalid && activeTicket.orderId && (
+                        <div className="mt-3.5 p-3 bg-red-500/10 border border-red-500/20 text-red-300 rounded-lg text-xs leading-relaxed max-w-md text-left flex items-start gap-2.5 font-sans">
+                          <AlertTriangle className="text-red-400 shrink-0 mt-0.5" size={14} />
+                          <div>
+                            <span className="font-bold text-red-200 block uppercase tracking-wide text-[10px] font-mono">Invalid Live Order ID Reference</span>
+                            <span className="opacity-90">
+                              The identifier <code className="bg-black/30 px-1 rounded text-orange-300 font-mono text-[11px] font-bold">{activeTicket.orderId}</code> could not be found or fetched. 
+                              The customer has been notified and asked to resubmit.
+                            </span>
+                          </div>
+                        </div>
+                      )}
                       
                       {/* Manual link entry area */}
                       <div className="mt-3 flex items-center gap-2 max-w-xs w-full">
@@ -1095,7 +1119,7 @@ export function InboxTab({
                   ? 'bg-[#1f2c34] text-[#8696a0] border-white/[0.02]' 
                   : 'bg-[#12141c] text-gray-500 border-white/[0.03]'
               }`}>
-                <span>{simChannel === 'WHATSAPP' ? 'Meta Cloud WhatsApp' : (settings?.companyName || 'NoshBerry Corp')}</span>
+                <span>{simChannel === 'WHATSAPP' ? 'Meta Cloud WhatsApp' : ((settings?.companyName && settings.companyName !== 'XYZ Corp') ? settings.companyName : 'Support Desk')}</span>
                 <div className="w-12 h-3.5 bg-black rounded-full absolute left-1/2 -translate-x-1/2 mt-1" />
                 <div className="flex items-center gap-1">
                   <span>5G</span>
@@ -1115,12 +1139,14 @@ export function InboxTab({
                   </div>
                 ) : (
                   <div className="w-7 h-7 bg-orange-500/10 rounded-full flex items-center justify-center border border-orange-500/20 shrink-0 self-center">
-                    <span className="font-extrabold text-[10px] text-orange-400 font-bold">NB</span>
+                    <span className="font-extrabold text-[10px] text-orange-400 font-bold">CS</span>
                   </div>
                 )}
                 <div>
                   <div className="text-[11px] font-bold text-gray-200">
-                    {simChannel === 'WHATSAPP' ? `${settings?.companyName || 'NoshBerry'} WA-Biz` : `${settings?.companyName || 'NoshBerry'} Support`}
+                    {simChannel === 'WHATSAPP' 
+                      ? `${(settings?.companyName && settings.companyName !== 'XYZ Corp') ? settings.companyName : 'Support Desk'} WA-Biz` 
+                      : `${(settings?.companyName && settings.companyName !== 'XYZ Corp') ? settings.companyName : 'Support Desk'} Support`}
                   </div>
                   <div className="text-[9px] font-mono text-gray-500 flex items-center gap-1">
                     <span className={`w-1.5 h-1.5 rounded-full ${simChannel === 'WHATSAPP' ? 'bg-[#00a884]' : 'bg-green-400'}`} />
@@ -1382,7 +1408,7 @@ export function InboxTab({
                   <input
                     id="simulator_chat_input"
                     type="text"
-                    placeholder={simChannel === 'WHATSAPP' ? "Message direct via WhatsApp..." : "Type Hinglish / Tamil..."}
+                    placeholder={simChannel === 'WHATSAPP' ? "Message direct via WhatsApp..." : "Type Hinglish / Hindi / English..."}
                     value={simMessage}
                     onChange={(e) => setSimMessage(e.target.value)}
                     className={`flex-1 rounded-lg px-2.5 py-2 text-[11px] focus:outline-none placeholder-gray-500 font-mono transition-colors text-left ${

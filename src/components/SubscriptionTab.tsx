@@ -1,6 +1,22 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { CreditCard, CheckCircle2, Lock, X, RefreshCw, Check, Zap, Sparkles, Sliders, Shield } from 'lucide-react';
+import { 
+  CreditCard, 
+  CheckCircle2, 
+  Lock, 
+  X, 
+  RefreshCw, 
+  Check, 
+  Zap, 
+  Sparkles, 
+  Sliders, 
+  Shield,
+  Activity,
+  BarChart3,
+  TrendingUp,
+  Clock,
+  CheckSquare
+} from 'lucide-react';
 
 interface SubscriptionTabProps {
   settings: any;
@@ -9,6 +25,7 @@ interface SubscriptionTabProps {
   uiLang: 'en' | 'hi';
   subscriptionTier: 'PRO' | 'ENTERPRISE';
   setSubscriptionTier: (tier: 'PRO' | 'ENTERPRISE') => void;
+  tickets?: any[];
 }
 
 export function SubscriptionTab({
@@ -17,7 +34,8 @@ export function SubscriptionTab({
   customFetch,
   uiLang,
   subscriptionTier,
-  setSubscriptionTier
+  setSubscriptionTier,
+  tickets = []
 }: SubscriptionTabProps) {
   const [billingInterval, setBillingInterval] = useState<'monthly' | 'yearly'>('monthly');
   const [checkoutPlan, setCheckoutPlan] = useState<'PRO' | 'ENTERPRISE' | null>(null);
@@ -36,6 +54,22 @@ export function SubscriptionTab({
   const expiryDateString = settings?.subscriptionExpiresAt 
     ? new Date(settings.subscriptionExpiresAt).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' })
     : 'N/A';
+
+  const totalTickets = tickets ? tickets.length : 0;
+  const resolvedTickets = tickets ? tickets.filter((t: any) => t.status === 'RESOLVED').length : 0;
+  const escalatedTickets = tickets ? tickets.filter((t: any) => t.status === 'ESCALATED').length : 0;
+  const aiPendingTickets = tickets ? tickets.filter((t: any) => t.status === 'AI_PENDING').length : 0;
+
+  const resolutionRate = totalTickets > 0 ? Math.round((resolvedTickets / totalTickets) * 100) : 100;
+
+  let ticketLimit = 50; // trial limit
+  if (isSubscribed) {
+    if (currentTier === 'ENTERPRISE') {
+      ticketLimit = 500000;
+    } else {
+      ticketLimit = 50000;
+    }
+  }
 
   return (
     <motion.div
@@ -196,6 +230,135 @@ export function SubscriptionTab({
                   />
                 </div>
               </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Live Monthly Usage Metrics & Value Realization Dashboard */}
+        <div id="usage_metrics_dashboard" className="bg-[#0c0d12]/90 border border-white/[0.04] p-6 rounded-2xl relative overflow-hidden space-y-5 shadow-xl">
+          {/* subtle decorative blur */}
+          <div className="absolute top-0 right-10 w-48 h-48 bg-emerald-500/5 rounded-full filter blur-[50px] pointer-events-none" />
+          
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="flex items-center gap-2.5">
+              <div className="p-2 rounded-lg bg-orange-500/10 border border-orange-500/20 text-orange-400">
+                <BarChart3 size={18} />
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-gray-200 font-sans tracking-tight">
+                  {uiLang === 'en' ? "Current Month's Handled Volume & Quotas" : "इस महीने की उपयोगिता एवं कोटा स्थिति"}
+                </h3>
+                <p className="text-[10px] text-gray-500 font-mono tracking-wider uppercase">
+                  {uiLang === 'en' ? "TRANSPARENT VALUE ENGINE METRICS" : "पारदर्शी मूल्य इंजन डेटा"}
+                </p>
+              </div>
+            </div>
+            
+            <div className="flex items-center gap-2 text-xs text-gray-450 font-mono bg-white/[0.02] border border-white/[0.03] px-3 py-1.5 rounded-lg shrink-0">
+              <Clock size={13} className="text-orange-500 shrink-0" />
+              <span>{uiLang === 'en' ? "Billing Cycle: Month-To-Date" : "बिलिंग चक्र: इस महीने का अब तक का"}</span>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {/* Card 1: Tickets Handled Meter */}
+            <div className="bg-white/[0.01] border border-white/[0.03] p-4 rounded-xl flex flex-col justify-between space-y-3">
+              <div className="flex justify-between items-start">
+                <span className="text-[10.5px] font-mono text-gray-400 font-medium">
+                  {uiLang === 'en' ? "TICKETS IN SYSTEM" : "सक्रिय कार्य टिकट"}
+                </span>
+                <span className="text-[9px] font-mono bg-orange-500/10 text-orange-400 px-1.5 py-0.5 rounded uppercase font-semibold">
+                  {isSubscribed ? currentTier : "TRIAL"}
+                </span>
+              </div>
+              <div>
+                <div className="flex items-baseline gap-1.5">
+                  <span className="text-2xl font-bold text-white font-mono">{totalTickets}</span>
+                  <span className="text-xs text-gray-500 font-mono">/ {ticketLimit.toLocaleString()} {uiLang === 'en' ? "limit" : "सीमा"}</span>
+                </div>
+                <div className="mt-2.5 space-y-1.5">
+                  <div className="h-2 w-full bg-white/[0.03] rounded-full overflow-hidden">
+                    <div 
+                      className="h-full bg-orange-500 transition-all duration-500" 
+                      style={{ width: `${Math.min(100, (totalTickets / ticketLimit) * 100)}%` }} 
+                    />
+                  </div>
+                  <div className="flex justify-between text-[9px] font-mono text-gray-500">
+                    <span>{Math.min(100, (totalTickets / ticketLimit) * 100).toFixed(2)}% {uiLang === 'en' ? "Used" : "उपयोग"}</span>
+                    <span>{uiLang === 'en' ? `${(ticketLimit - totalTickets).toLocaleString()} remaining` : `${(ticketLimit - totalTickets).toLocaleString()} बचे हैं`}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Card 2: Resolution & Agent Rate */}
+            <div className="bg-white/[0.01] border border-white/[0.03] p-4 rounded-xl flex flex-col justify-between space-y-3">
+              <div className="flex justify-between items-start">
+                <span className="text-[10.5px] font-mono text-gray-400 font-medium">
+                  {uiLang === 'en' ? "RESOLUTION COMPLETION" : "सफलतापूर्वक समाधान दर"}
+                </span>
+                <span className="text-[9px] font-mono bg-emerald-500/10 text-emerald-400 px-1.5 py-0.5 rounded uppercase font-semibold flex items-center gap-1">
+                  <TrendingUp size={10} />
+                  <span>{uiLang === 'en' ? "OUTSTANDING" : "शानदार"}</span>
+                </span>
+              </div>
+              <div>
+                <div className="flex items-baseline gap-1.5">
+                  <span className="text-2xl font-bold text-white font-mono">{resolutionRate}%</span>
+                  <span className="text-xs text-gray-505 font-sans">
+                    {uiLang === 'en' ? "AI Autocomplete Rate" : "स्वचालित रेजोल्यूशन दर"}
+                  </span>
+                </div>
+                <div className="mt-2.5 flex items-center justify-between text-[9px] font-mono text-gray-500 pt-2.5 border-t border-white/[0.03]">
+                  <div className="flex items-center gap-1">
+                    <div className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+                    <span>{resolvedTickets} {uiLang === 'en' ? "Resolved" : "समाधान हुआ"}</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <div className="h-1.5 w-1.5 rounded-full bg-amber-400" />
+                    <span>{aiPendingTickets + escalatedTickets} {uiLang === 'en' ? "Active" : "सक्रिय"}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Card 3: Saved Expenses Value */}
+            <div className="bg-white/[0.01] border border-white/[0.03] p-4 rounded-xl flex flex-col justify-between space-y-3">
+              <div className="flex justify-between items-start">
+                <span className="text-[10.5px] font-mono text-gray-400 font-medium">
+                  {uiLang === 'en' ? "ESTIMATED COGNITIVE SAVINGS" : "अनुमानित कुल वित्तीय बचत"}
+                </span>
+                <span className="text-[9px] font-mono bg-orange-500/10 text-orange-400 px-1.5 py-0.5 rounded uppercase font-semibold">
+                  {uiLang === 'en' ? "LIVE SAVED" : "बचत हुई"}
+                </span>
+              </div>
+              <div>
+                <div className="flex items-baseline gap-1.5">
+                  <span className="text-2xl font-bold text-orange-450 font-mono">
+                    ${(resolvedTickets * 2.5 + escalatedTickets * 0.5).toFixed(2)}
+                  </span>
+                  <span className="text-xs text-gray-505 font-sans">
+                    {uiLang === 'en' ? "Saved Labor Cost" : "बचाई गई श्रम लागत"}
+                  </span>
+                </div>
+                <p className="text-[9px] text-gray-550 font-mono mt-2 pt-2.5 border-t border-white/[0.03]">
+                  {uiLang === 'en' 
+                    ? "Based on average cognitive routing costs of $2.50/human touch save."
+                    : "प्रत्येक स्वचालित समाधान पर औसतन $२.५० की सहायता लागत बचत पर आधारित।"}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Value proposition checklist banner */}
+          <div className="bg-gradient-to-r from-orange-500/[0.03] to-transparent border border-orange-500/10 p-3 rounded-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs leading-relaxed">
+            <div className="flex items-center gap-2">
+              <Activity size={12} className="text-orange-400 shrink-0" />
+              <p className="text-gray-400 text-[10.5px] font-sans">
+                {uiLang === 'en'
+                  ? `With ${totalTickets || 0} total tickets in workspace, your current customer workbench models have automated ${resolvedTickets || 0} questions and diverted ${escalatedTickets || 0} complex questions directly.`
+                  : `कुल ${totalTickets || 0} टिकटों में, आपके मॉडल ने ${resolvedTickets || 0} प्रश्नों का स्वचालित उत्तर दिया है और ${escalatedTickets || 0} मुश्किल सवालों को स्थानांतरित किया है।`}
+              </p>
             </div>
           </div>
         </div>
@@ -556,6 +719,8 @@ export function SubscriptionTab({
                           required
                           maxLength={3}
                           placeholder="•••"
+                          value={payingCardCvc}
+                          onChange={(e) => setPayingCardCvc(e.target.value.replace(/\D/g, ''))}
                           className="w-full h-9 px-3 text-xs rounded-lg border border-white/[0.04] bg-white/[0.02] text-[#f2ede4] placeholder-gray-655 focus:outline-none focus:border-orange-500 transition font-mono"
                         />
                       </div>

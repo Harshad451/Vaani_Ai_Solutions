@@ -17,6 +17,12 @@ export let firestoreInstance = firebaseConfig.firestoreDatabaseId
   ? getFirestore(firebaseApp, firebaseConfig.firestoreDatabaseId)
   : getFirestore(firebaseApp);
 
+try {
+  firestoreInstance.settings({ ignoreUndefinedProperties: true });
+} catch (e) {
+  console.warn("Failed to set ignoreUndefinedProperties on primary firestoreInstance:", e);
+}
+
 export let isUsingCustomDatabase = !!firebaseConfig.firestoreDatabaseId;
 export let firestoreAuthErrorDetected = { value: false }; // Packaged object to keep other modules synced
 
@@ -35,19 +41,26 @@ export const handleFirestoreErrorAndCheckFallback = async (err: any, retryFn?: (
   const errCode = err?.code;
   const isFallbackNeeded = 
     errMsg.includes('PERMISSION_DENIED') || 
-    errMsg.includes('7') || 
     errMsg.includes('INSUFFICIENT PERMISSIONS') ||
+    errMsg.includes('INSUFFICIENT_PERMISSIONS') ||
     errMsg.includes('NOT_FOUND') ||
     errMsg.includes('NOT FOUND') ||
-    errMsg.includes('DATABASE') ||
-    errMsg.includes('5') ||
     errCode === 5 ||
-    errCode === 7;
+    errCode === 7 ||
+    errCode === 16 ||
+    String(errCode) === '5' ||
+    String(errCode) === '7' ||
+    String(errCode) === '16';
 
   if (isFallbackNeeded) {
     if (isUsingCustomDatabase) {
-      console.warn("Database error or permission denied for custom database. Retrying on (default) database...");
+      console.log("[Firestore] Custom database not yet reachable or lacks credentials. Gradual recovery: retrying on standard (default) database...");
       firestoreInstance = getFirestore(firebaseApp);
+      try {
+        firestoreInstance.settings({ ignoreUndefinedProperties: true });
+      } catch (e) {
+        console.warn("Failed to set ignoreUndefinedProperties on fallback firestoreInstance:", e);
+      }
       isUsingCustomDatabase = false;
       if (retryFn) {
         try {
@@ -57,18 +70,20 @@ export const handleFirestoreErrorAndCheckFallback = async (err: any, retryFn?: (
           const retryCode = retryErr?.code;
           const isRetryFallbackNeeded = 
             retryMsg.includes('PERMISSION_DENIED') || 
-            retryMsg.includes('7') || 
             retryMsg.includes('INSUFFICIENT PERMISSIONS') ||
+            retryMsg.includes('INSUFFICIENT_PERMISSIONS') ||
             retryMsg.includes('NOT_FOUND') ||
             retryMsg.includes('NOT FOUND') ||
-            retryMsg.includes('DATABASE') ||
-            retryMsg.includes('5') ||
             retryCode === 5 ||
-            retryCode === 7;
+            retryCode === 7 ||
+            retryCode === 16 ||
+            String(retryCode) === '5' ||
+            String(retryCode) === '7' ||
+            String(retryCode) === '16';
 
           if (isRetryFallbackNeeded) {
             if (!firestoreAuthErrorDetected.value) {
-              console.warn("Default database also failed or lacks permissions. Disabling Firestore logging to prevent spam and falling back entirely to in-memory/local JSON backups.");
+              console.log("[Firestore] Default database also has restricted credentials or is not initialized. Activating high-uptime local backup JSON storage.");
               firestoreAuthErrorDetected.value = true;
             }
           } else {
@@ -78,7 +93,7 @@ export const handleFirestoreErrorAndCheckFallback = async (err: any, retryFn?: (
       }
     } else {
       if (!firestoreAuthErrorDetected.value) {
-        console.warn("Firestore access failed or missing permissions. Falling back entirely to in-memory/local JSON backups.");
+        console.log("[Firestore] Active database not yet reachable. Activating high-uptime local backup JSON storage.");
         firestoreAuthErrorDetected.value = true;
       }
     }
@@ -90,8 +105,39 @@ export const handleFirestoreErrorAndCheckFallback = async (err: any, retryFn?: (
 // Seed initial empty operational tickets so customers can add them manually via the simulator
 export let tickets: Ticket[] = [];
 
-// Seeding mock orders database (starts empty)
-export const mockOrders: Order[] = [];
+// Seeding mock orders database with realistic orders
+export const mockOrders: Order[] = [
+  {
+    id: "OD-90210",
+    customerName: "Rahul Sharma",
+    itemName: "Premium Silk Kurta Set",
+    status: "In Transit",
+    paymentMode: "UPI (Paytm)",
+    cost: 2199,
+    carrier: "Delhivery Tracker",
+    estimatedDelivery: "Expected in 2 days"
+  },
+  {
+    id: "OD-70415",
+    customerName: "Priya Patel",
+    itemName: "Cotton Anarkali Dress",
+    status: "Shipped",
+    paymentMode: "Net Banking",
+    cost: 3499,
+    carrier: "BlueDart Express",
+    estimatedDelivery: "Expected tomorrow by 5 PM"
+  },
+  {
+    id: "OD-30912",
+    customerName: "Amit Verma",
+    itemName: "Classic Denim Jacket",
+    status: "Delivered",
+    paymentMode: "Cash on Delivery",
+    cost: 1899,
+    carrier: "Ecom Express",
+    estimatedDelivery: "Delivered yesterday"
+  }
+];
 
 export function detectAndAssignOrder(ticket: Ticket) {
   if (!ticket.messages || ticket.messages.length === 0) return;
@@ -236,8 +282,8 @@ export const loadEmployees = () => {
 
 // Global settings
 export let globalSettings: Settings = {
-  companyName: "NoshBerry Corp",
-  supportEmail: "support@noshberry.com",
+  companyName: "XYZ Corp",
+  supportEmail: "support@xyz.com",
   slaMinutes: 10,
   botEnabled: true,
   defaultGreeting: "Welcome to our Support Assist! How can we help you today with your order?",
@@ -317,7 +363,9 @@ export const saveCompanySettingsToFirestore = async (companyName: string, settin
   if (firestoreAuthErrorDetected.value) return;
   try {
     const docId = companyName.replace(/[^a-zA-Z0-9_\-]/g, '_');
-    await firestore.collection('company_settings').doc(docId).set(settings);
+    // Safely remove any undefined properties to satisfy Firestore document schema
+    const sanitizedSettings = JSON.parse(JSON.stringify(settings));
+    await firestore.collection('company_settings').doc(docId).set(sanitizedSettings);
   } catch (e) {
     console.warn(`Firestore saveCompanySettings failed to sync: ${e instanceof Error ? e.message : e}`);
   }
