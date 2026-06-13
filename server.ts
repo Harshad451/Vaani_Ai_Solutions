@@ -1578,7 +1578,11 @@ app.post('/api/settings/test-connection', requireAuth, async (req, res) => {
 app.get('/api/tickets', (req, res) => {
   const emp = getEmployeeFromRequest(req);
   if (emp && emp.companyName) {
-    const filtered = tickets.filter(t => t.companyName === emp.companyName);
+    const empComp = emp.companyName === 'Support Desk' ? globalSettings.companyName : emp.companyName;
+    const filtered = tickets.filter(t => {
+      const ticketComp = t.companyName === 'Support Desk' ? globalSettings.companyName : t.companyName;
+      return ticketComp === empComp;
+    });
     return res.json(filtered);
   }
   res.json(tickets);
@@ -1974,7 +1978,10 @@ app.post('/api/tickets', async (req, res) => {
   }
 
   const emp = getEmployeeFromRequest(req);
-  const companyName = bodyCompanyName || emp?.companyName || globalSettings.companyName;
+  let companyName = bodyCompanyName || emp?.companyName || globalSettings.companyName;
+  if (companyName === 'Support Desk') {
+    companyName = globalSettings.companyName;
+  }
 
   // Find active ticket if any
   let ticket = tickets.find(t => t.phoneNumber === phoneNumber && t.status !== 'RESOLVED');

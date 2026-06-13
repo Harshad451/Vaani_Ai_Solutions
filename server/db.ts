@@ -334,12 +334,16 @@ export const getSubscriptionDaysLeft = (expiresAtStr?: string): number => {
 
 export const getSettingsForCompany = (companyName?: string): Settings => {
   let settings: Settings;
-  if (companyName && companySettings[companyName]) {
-    settings = companySettings[companyName];
+  let resolvedName = companyName;
+  if (resolvedName === 'Support Desk') {
+    resolvedName = globalSettings.companyName;
+  }
+  if (resolvedName && companySettings[resolvedName]) {
+    settings = companySettings[resolvedName];
   } else {
     settings = {
       ...globalSettings,
-      companyName: companyName || globalSettings.companyName
+      companyName: resolvedName || globalSettings.companyName
     };
   }
 
