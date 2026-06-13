@@ -82,7 +82,7 @@ const PORT = 3000;
 
 
 
-// Periodic ticket inactivity auto-closure checker (1 minute inactivity timeout)
+// Periodic ticket inactivity auto-closure checker (3 minutes inactivity timeout)
 setInterval(async () => {
   const now = Date.now();
   for (const ticket of tickets) {
@@ -90,8 +90,8 @@ setInterval(async () => {
       const lastMsg = ticket.messages[ticket.messages.length - 1];
       if (lastMsg && (lastMsg.sender === 'AI' || lastMsg.sender === 'AGENT')) {
         const elapsed = now - new Date(lastMsg.createdAt).getTime();
-        // 1 minute (60,000 milliseconds) inactivity threshold
-        if (elapsed >= 60000) {
+        // 3 minutes (180,000 milliseconds) inactivity threshold
+        if (elapsed >= 180000) {
           ticket.status = 'RESOLVED';
           ticket.updatedAt = new Date().toISOString();
           
@@ -99,13 +99,13 @@ setInterval(async () => {
           const sysMsg: Message = {
             id: "msg_" + Math.floor(Math.random() * 90000 + 10000),
             sender: 'SYSTEM',
-            content: "Conversation automatically closed. Reason: Customer Inactivity",
+            content: "Conversation automatically closed. Reason: Customer Inactivity (3 minutes silence)",
             createdAt: new Date().toISOString()
           };
           ticket.messages.push(sysMsg);
           
           await saveTicketToFirestore(ticket);
-          console.log(`[Customer Inactivity Auto-Closure] Automatically closed ticket ${ticket.id} after 1 minute of customer silence.`);
+          console.log(`[Customer Inactivity Auto-Closure] Automatically closed ticket ${ticket.id} after 3 minutes of customer silence.`);
         }
       }
     }
@@ -2291,9 +2291,10 @@ Your task: politely and directly inform the customer that their Order ID is inva
 
   ticket.messages.push(aiMsg);
 
+  // We do NOT close the ticket automatically even if it seems the query is solved.
+  // Instead, the 3-minute inactivity timer will safely close the ticket if the customer doesn't respond.
   if (analysisResult && analysisResult.close_ticket === true) {
-    ticket.status = 'RESOLVED';
-    console.log(`[Auto-Resolved ticket ${ticket.id} on End-of-Conversation resolution flag]`);
+    console.log(`[Auto-Resolved ticket skipped on active AI prompt] Close ticket flagged but deferred to 3-minute silence checker.`);
   }
 
   await saveTicketToFirestore(ticket);
@@ -2504,8 +2505,7 @@ app.post('/api/webhook/whatsapp', async (req, res) => {
       aiReplied = true;
       console.log(`[Auto-Replied via simulated WhatsApp API outbound node to ${phoneNumber}]:`, actionReply);
       if (analysis && analysis.close_ticket === true) {
-        ticket.status = 'RESOLVED';
-        console.log(`[Auto-Resolved ticket ${ticket.id} on End-of-Conversation resolution flag via webhook]`);
+        console.log(`[Auto-Resolved ticket skipped via webhook] Close ticket flagged but deferred to 3-minute silence checker.`);
       }
     }
 

@@ -163,16 +163,19 @@ CRITICAL LANGUAGE & LINGUISTIC SELECTION RULE (ANTI-HINGLISH HYBRID CORRUPTIONS)
   "confidence": float between 0.0 and 1.0,
   "should_escalate": boolean (true ONLY for very urgent cases, legal threats, extreme abuse, or explicit requests for live support managers. For normal questions, AI should attempt to solve customer issues directly with at least 90% confidence. Set should_escalate to true ONLY when confidence is under 0.90 or it is a truly urgent escalation),
   "sentiment": "Positive" | "Neutral" | "Negative" | "Angry",
-  "close_ticket": boolean (true ONLY when the customer's issue has been fully addressed and resolved, and no further action, clarification, or confirmation is required from either support or the customer. Set to true if the customer says thank you, expresses satisfaction, says goodbye, or when the issue is fully answered and resolves the ticket naturally. Set to false otherwise),
+  "close_ticket": boolean (MUST always be set to false. We do not support automatic immediate ticket closure as we must ask if they need further assistance and let our 3-minute inactivity loop close it automatically if the customer doesn't respond),
   "vernacular_reply": "A concise, highly empathetic, grammatically correct support solution answering the specific questions asked by the customer last, written 100% in the target language (${targetLang}) script."
 }
 IMPORTANT: Output only the raw valid JSON payload without backticks or markdown formatting.
 
 CONVERSATION NATURAL END / RESOLUTION CLOSURE RULES:
-If you determine the issue is fully addressed and "close_ticket" is set to true:
-- The "vernacular_reply" MUST politely summarize the resolution (briefly, if needed), use a friendly closing message (e.g. "Happy to help!", "Have a great day!"), and end with a clear goodbye.
-- You are STRICTLY FORBIDDEN from asking any questions at this final stage (Do NOT ask "Can I help you with anything else?", "Is there anything else?", or "Can I close the ticket?").
-- Do NOT mention internal actions or system terminology like "closing the ticket", "ticket status changes", "auto-closure logic", or "system timeouts" in the reply.
+If you determine that the customer's issue has been fully addressed, resolved, or satisfied, or if the customer expresses gratitude (e.g. says "thank you", "thanks", "dhanyawad", "shukriya", etc.):
+- Always keep the ticket open. You MUST set "close_ticket" to false in your output JSON.
+- The "vernacular_reply" MUST politely summarize/close the current query and ask specifically: "Do you need any other assistance? Feel free to ask." translated accurately in the customer's target language (${targetLang}).
+   - If the target language is **English**: Must end exactly with "Do you need any other assistance? Feel free to ask."
+   - If the target language is **Hindi (Native)**: Must end exactly with "क्या आपको किसी अन्य सहायता की आवश्यकता है? बेझिझक पूछें।"
+   - If the target language is **Hinglish**: Must end exactly with "Kya aapko koi aur assistance chahiye? Feel free to ask."
+- Let the customer have the option to ask further questions if they wish. Do NOT say a final goodbye or say "ticket closed". Our system will automatically resolve and close the ticket after 3 minutes of customer silence.
 - Maintain a polite, natural, and friendly tone at all times.`;
 
   if (isEscalated) {
@@ -372,13 +375,15 @@ export const runLocalClassifier = (query: string): any => {
   }
 
   const isSatisfied = norm.includes("thank") || norm.includes("dhanyawad") || norm.includes("shukriya") || norm.includes("badiya") || norm.includes("done") || norm.includes("ok thanks") || norm.includes("bye") || norm.includes("alvida");
-  const close_ticket = isSatisfied;
+  const close_ticket = false; // We do not auto-close immediately
 
-  if (close_ticket) {
-    if (detected_language.startsWith("Hindi") || detected_language.startsWith("Hinglish")) {
-      vernacular_reply = "Aapki madad karke khushi hui! Sabhi queries resolve ho chuki hain. Have a great day! Alvida!";
+  if (isSatisfied) {
+    if (detected_language.startsWith("Hindi")) {
+      vernacular_reply = "आपकी सहायता करके बहुत खुशी हुई! क्या आपको किसी अन्य सहायता की आवश्यकता है? बेझिझक पूछें।";
+    } else if (detected_language.startsWith("Hinglish")) {
+      vernacular_reply = "Aapki help karke khushi hui! Kya aapko koi aur assistance chahiye? Feel free to ask.";
     } else {
-      vernacular_reply = "I am happy to help you today! Your issue is fully resolved. Have a great day! Goodbye!";
+      vernacular_reply = "I'm happy to help you! Do you need any other assistance? Feel free to ask.";
     }
   }
 
