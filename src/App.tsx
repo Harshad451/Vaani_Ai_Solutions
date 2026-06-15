@@ -1397,14 +1397,20 @@ export default function App() {
   };
 
   // MARK ticket as resolved
-  const handleResolveTicket = async (id: string, customerEmail?: string) => {
+  const handleResolveTicket = async (id: string, customerEmail?: string, subject?: string, body?: string) => {
     try {
+      const token = localStorage.getItem('vaani_logged_token');
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json'
+      };
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+
       const res = await fetch(`/api/tickets/${id}/resolve`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ customerEmail })
+        headers,
+        body: JSON.stringify({ customerEmail, subject, body })
       });
       if (res.ok) {
         await fetchTickets();

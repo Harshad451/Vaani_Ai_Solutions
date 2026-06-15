@@ -163,19 +163,21 @@ CRITICAL LANGUAGE & LINGUISTIC SELECTION RULE (ANTI-HINGLISH HYBRID CORRUPTIONS)
   "confidence": float between 0.0 and 1.0,
   "should_escalate": boolean (true ONLY for very urgent cases, legal threats, extreme abuse, or explicit requests for live support managers. For normal questions, AI should attempt to solve customer issues directly with at least 90% confidence. Set should_escalate to true ONLY when confidence is under 0.90 or it is a truly urgent escalation),
   "sentiment": "Positive" | "Neutral" | "Negative" | "Angry",
-  "close_ticket": boolean (MUST always be set to false. We do not support automatic immediate ticket closure as we must ask if they need further assistance and let our 3-minute inactivity loop close it automatically if the customer doesn't respond),
+  "close_ticket": boolean (Set to true if the customer's core query/issue is now solved or if they express gratitude/closure; otherwise false.),
   "vernacular_reply": "A concise, highly empathetic, grammatically correct support solution answering the specific questions asked by the customer last, written 100% in the target language (${targetLang}) script."
 }
 IMPORTANT: Output only the raw valid JSON payload without backticks or markdown formatting.
 
 CONVERSATION NATURAL END / RESOLUTION CLOSURE RULES:
-If you determine that the customer's issue has been fully addressed, resolved, or satisfied, or if the customer expresses gratitude (e.g. says "thank you", "thanks", "dhanyawad", "shukriya", etc.):
-- Always keep the ticket open. You MUST set "close_ticket" to false in your output JSON.
-- The "vernacular_reply" MUST politely summarize/close the current query and ask specifically: "Do you need any other assistance? Feel free to ask." translated accurately in the customer's target language (${targetLang}).
-   - If the target language is **English**: Must end exactly with "Do you need any other assistance? Feel free to ask."
-   - If the target language is **Hindi (Native)**: Must end exactly with "क्या आपको किसी अन्य सहायता की आवश्यकता है? बेझिझक पूछें।"
-   - If the target language is **Hinglish**: Must end exactly with "Kya aapko koi aur assistance chahiye? Feel free to ask."
-- Let the customer have the option to ask further questions if they wish. Do NOT say a final goodbye or say "ticket closed". Our system will automatically resolve and close the ticket after 3 minutes of customer silence.
+- **ONLY** ask the customer if they need further assistance if you determine that their core issue has been fully and successfully addressed/resolved, or if the customer expresses clear gratitude or closure (such as saying "thank you", "thanks", "dhanyawad", "shukriya", "all good", etc.).
+- **STRICT PROHIBITION ON REPETITIVE PROMPTS**: In intermediate chat messages, while diagnosing the issue, collecting information (like asking for Order ID, registered email, or clarifying details), or addressing active questions, you **MUST NOT** append "Do you need any other assistance? Feel free to ask." (or its translation/colloquial version). Repeat: DO NOT ask this repeatedly or during intermediate turns. It is highly repetitive and unprofessional.
+- When you are confident the issue is resolved or they expressed gratitude/thanks:
+   - You MUST set "close_ticket" to true in your output JSON.
+   - The "vernacular_reply" MUST politely summarize/close the current query and ask specifically: "Do you need any other assistance? Feel free to ask." translated accurately in the customer's target language (${targetLang}).
+     - If the target language is **English**: Must end exactly with "Do you need any other assistance? Feel free to ask."
+     - If the target language is **Hindi (Native)**: Must end exactly with "क्या आपको किसी अन्य सहायता की आवश्यकता है? बेझिझक पूछें।"
+     - If the target language is **Hinglish**: Must end exactly with "Kya aapko koi aur assistance chahiye? Feel free to ask."
+   - Let the customer have the option to ask further questions if they wish.
 - Maintain a polite, natural, and friendly tone at all times.`;
 
   if (isEscalated) {
@@ -375,7 +377,7 @@ export const runLocalClassifier = (query: string): any => {
   }
 
   const isSatisfied = norm.includes("thank") || norm.includes("dhanyawad") || norm.includes("shukriya") || norm.includes("badiya") || norm.includes("done") || norm.includes("ok thanks") || norm.includes("bye") || norm.includes("alvida");
-  const close_ticket = false; // We do not auto-close immediately
+  const close_ticket = isSatisfied;
 
   if (isSatisfied) {
     if (detected_language.startsWith("Hindi")) {
@@ -571,3 +573,127 @@ Output the precise JSON analysis with your vernacular reply.`;
 
   return analysisResult;
 }
+
+export async function draftResolutionEmail(ticket: Ticket): Promise<{ subject: string; body: string }> {
+  const companyName = getSettingsForCompany(ticket.companyName).companyName || "VaaniAI Solutions";
+  const recentMessages = ticket.messages || [];
+  const chatContextText = recentMessages
+    .filter(m => m.sender === 'CUSTOMER' || m.sender === 'AI' || m.sender === 'AGENT')
+    .map(m => `${m.sender}: ${m.content}`)
+    .join('\n');
+
+  let orderInfoText = "No order detail linked.";
+  if (ticket.orderDetail) {
+    orderInfoText = `Order ID: ${ticket.orderDetail.id}, Item: ${ticket.orderDetail.itemName}, Status: ${ticket.orderDetail.status}, Cost: ₹${ticket.orderDetail.cost}, Expected Delivery: ${ticket.orderDetail.estimatedDelivery || 'N/A'}`;
+  }
+
+  const systemInstruction = `You are an expert executive at ${companyName}'s Resolution Desk. 
+Your task is to draft a highly professional, formal, and authoritative email summarizing the outcomes of a support conversation.
+The email must be structured in very formal business English, suitable for a customer.
+
+Drafting Directives:
+1. Address the customer formally: "Dear ${ticket.customerName}," or "Dear Customer," if name is unavailable.
+2. Formulate a highly precise subject line. It should include the Ticket ID #${ticket.id}.
+3. Summarize the major issues the customer raised.
+4. Detail the specific solutions/resolutions that were presented during the conversation.
+5. If there are order logistics or payment details, state them clearly and formally.
+6. End with formal sign-off lines from "${companyName} Support Desk" and express readiness to help if they have future inquiries.
+7. Output MUST be a valid JSON with keys: "subject" and "body" (using newline characters '\\n' for paragraph breaks). Do not wrap inside other properties or write markdown tick blocks.`;
+
+  const promptText = `Here is the conversation log:
+${chatContextText}
+
+Linked Order Data:
+${orderInfoText}
+
+Draft the formal email and output strictly as a JSON object matching this schema:
+{
+  "subject": "The formal email subject line",
+  "body": "The complete formal email body prose"
+}`;
+
+  const geminiClient = getGeminiClient();
+  if (geminiClient) {
+    let responseText = '';
+    try {
+      console.log("[Gemini] Attempting to draft resolution email via gemini-3.1-flash-lite...");
+      const response = await retryWithBackoff(() =>
+        geminiClient.models.generateContent({
+          model: 'gemini-3.1-flash-lite',
+          contents: promptText,
+          config: {
+            systemInstruction,
+            responseMimeType: "application/json",
+          }
+        })
+      );
+      responseText = response.text || '';
+    } catch (err: any) {
+      console.warn(`[Gemini] gemini-3.1-flash-lite failed for email draft (${formatErrorOutput(err)}), falling back to gemini-3.5-flash...`);
+      try {
+        const response35 = await retryWithBackoff(() =>
+          geminiClient.models.generateContent({
+            model: 'gemini-3.5-flash',
+            contents: promptText,
+            config: {
+              systemInstruction,
+              responseMimeType: "application/json",
+            }
+          })
+        );
+        responseText = response35.text || '';
+      } catch (flashErr: any) {
+        console.error("Failed drafting email via both Gemini models:", formatErrorOutput(flashErr));
+      }
+    }
+
+    if (responseText) {
+      try {
+        const cleanJSON = responseText.substring(responseText.indexOf('{'), responseText.lastIndexOf('}') + 1);
+        const res = JSON.parse(cleanJSON);
+        if (res.subject && res.body) {
+          return { subject: res.subject, body: res.body };
+        }
+      } catch (jsonErr: any) {
+        console.error("Failed to parse drafted email JSON response:", jsonErr);
+      }
+    }
+  }
+
+  // Fallback to high quality template-based prose if AI API fails or is not available
+  const resolvedDateStr = new Date().toLocaleDateString('en-US', {
+    weekday: 'long',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric'
+  });
+  
+  const customerInquiry = ticket.lastIntent ? ticket.lastIntent.replace(/_/g, ' ') : "support inquiry";
+  const orderDetailsProse = ticket.orderDetail 
+    ? `Regarding your shipment reference ${ticket.orderDetail.id} ("${ticket.orderDetail.itemName}"), our logistics reports indicate that its current status is ${ticket.orderDetail.status}. The expected delivery has been synchronized for ${ticket.orderDetail.estimatedDelivery || "the specified date range"}.`
+    : `Our records have verified your profile information and have successfully logged all corresponding resolutions.`;
+
+  const fallbackSubject = `[Resolved Ticket #${ticket.id}] Formal Resolution Summary - ${companyName}`;
+  const fallbackBody = `Dear ${ticket.customerName},
+
+We are writing to formally confirm that your support session regarding "${customerInquiry}" (Ticket ID: #${ticket.id}) has been marked as fully resolved.
+
+${orderDetailsProse}
+
+To ensure complete clarity, we have listed the core details of your inquiry below:
+• Ticket ID: #${ticket.id}
+• Status: Resolved
+• Resolution Date: ${resolvedDateStr}
+• Support Executive: ${ticket.assignedToName || 'Customer Success Division'}
+
+If you require any further assistance or wish to have some details modified/checked, please do not hesitate to contact us. We remain at your disposal to guarantee premium operational service.
+
+Thank you for choosing ${companyName}.
+
+Sincerely,
+Customer Resolutions Division
+${companyName} Support Desk`;
+
+  return { subject: fallbackSubject, body: fallbackBody };
+}
+

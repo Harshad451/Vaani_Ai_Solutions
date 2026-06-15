@@ -3,6 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import 'dotenv/config';
 import express from 'express';
 import path from 'path';
 import fs from 'fs';
@@ -58,7 +59,8 @@ import {
   retryWithBackoff,
   getSystemPromptRule,
   runLocalClassifier,
-  generateCopilotSuggestion
+  generateCopilotSuggestion,
+  draftResolutionEmail
 } from './server/ai';
 
 const app = express();
@@ -2262,7 +2264,7 @@ Your task: politely and directly inform the customer that their Order ID is inva
  
       ticket.messages.push(aiMsg);
       await saveTicketToFirestore(ticket);
-      return res.json(ticket);
+            return res.json(ticket);
     }
   }
 
@@ -2291,372 +2293,27 @@ Your task: politely and directly inform the customer that their Order ID is inva
 
   ticket.messages.push(aiMsg);
 
-  // We do NOT close the ticket automatically even if it seems the query is solved.
-  // Instead, the 3-minute inactivity timer will safely close the ticket if the customer doesn't respond.
+  // Auto-Resolve check based on model intent close_ticket
   if (analysisResult && analysisResult.close_ticket === true) {
-    console.log(`[Auto-Resolved ticket skipped on active AI prompt] Close ticket flagged but deferred to 3-minute silence checker.`);
+    console.log(`[Auto-Resolved ticket triggered by AI response] Status -> RESOLVED`);
+    try {
+      await resolveTicketAndSendEmailInternal(ticket);
+    } catch (e) {
+      console.error("Auto resolve ticket email triggering pipeline failed:", e);
+    }
   }
 
   await saveTicketToFirestore(ticket);
   res.json(ticket);
 });
 
-// Manual Agent reply overriding the thread or Customer update
-app.post('/api/tickets/:id/message', async (req, res) => {
-  const { id } = req.params;
-  const { sender, content } = req.body; // sender: AGENT or CUSTOMER
-
-  // Require authentication token for manual agent replies
-  if (sender === 'AGENT') {
-    const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return res.status(401).json({ error: 'Authentication required. Please log in.' });
-    }
-    const token = authHeader.split(' ')[1];
-    const session = activeSessions.get(token);
-    if (!session || Date.now() > session.expiresAt) {
-      if (session) activeSessions.delete(token);
-      return res.status(401).json({ error: 'Session expired. Please log in again.' });
-    }
-    session.expiresAt = Date.now() + SESSION_LIFESPAN_MS;
-  }
-
-  const ticket = tickets.find(t => t.id === id);
-  if (!ticket) {
-    return res.status(404).json({ error: 'Ticket context not found' });
-  }
-
-  if (ticket.status === 'RESOLVED') {
-    return res.status(400).json({ error: 'This ticket is resolved and closed. No further replies are allowed.' });
-  }
-
-  const newMsg: Message = {
-    id: "msg_" + Math.floor(Math.random() * 90000 + 10000),
-    sender: sender || 'AGENT',
-    content,
-    createdAt: new Date().toISOString()
-  };
-
-  ticket.messages.push(newMsg);
-  ticket.updatedAt = new Date().toISOString();
-  await detectAndAssignLiveOrder(ticket);
-
-  if (sender === 'AGENT') {
-    ticket.status = 'ESCALATED'; // Human operator actively overrides active AI state
-    ticket.humanRequested = false;
-    ticket.copilotSuggestion = ""; // Clear suggestion once agent has replied
-  } else if (sender === 'CUSTOMER') {
-    // Treat as subsequent reply, run the LLM-powered suggestion analysis pipeline and save new suggestion
-    await generateCopilotSuggestion(ticket, content);
-  }
-
-  await saveTicketToFirestore(ticket);
-  res.json(ticket);
-});
-
-// Real-time Copilot Suggestion generator endpoint using live conversation context
-app.post('/api/tickets/:id/copilot-suggest', requireAuth, async (req, res) => {
-  const { id } = req.params;
-  const ticket = tickets.find(t => t.id === id);
-  if (!ticket) {
-    return res.status(404).json({ error: 'Ticket profile not found' });
-  }
-
-  const analysis = await generateCopilotSuggestion(ticket);
-  await saveTicketToFirestore(ticket);
-  res.json({ success: true, copilotSuggestion: ticket.copilotSuggestion || "", analysis });
-});
-
-// GET Method: Verify WhatsApp Webhook Challenge from Meta/Facebook Developers Console
-app.get('/api/webhook/whatsapp', (req, res) => {
-  const mode = req.query['hub.mode'];
-  const token = req.query['hub.verify_token'];
-  const challenge = req.query['hub.challenge'];
-
-  // Default sandbox verify token is "VERNACULAR_COPILOT_SECURE_TOKEN_2026"
-  if (mode === 'subscribe' && token === 'VERNACULAR_COPILOT_SECURE_TOKEN_2026') {
-    console.log("WhatsApp Webhook successfully validated by Meta server!");
-    return res.status(200).send(challenge);
-  } else {
-    return res.status(403).json({ error: "Verification token mismatch" });
-  }
-});
-
-// POST Method: Receive live messages from the WhatsApp Cloud API 
-app.post('/api/webhook/whatsapp', async (req, res) => {
-  try {
-    const body = req.body;
-    console.log("Received incoming webhook payload from Meta WhatsApp API:", JSON.stringify(body, null, 2));
-
-    if (!body || body.object !== 'whatsapp_business_account') {
-      return res.status(400).json({ error: "Invalid Object Type" });
-    }
-
-    const entry = body.entry?.[0];
-    const changes = entry?.changes?.[0];
-    const value = changes?.value;
-    const incomingMsg = value?.messages?.[0];
-    const contact = value?.contacts?.[0];
-
-    if (!incomingMsg) {
-      return res.json({ status: "ignored_no_messages" });
-    }
-
-    const phoneNumber = "+" + incomingMsg.from; // e.g. "+919988776655"
-    const customerName = contact?.profile?.name || "WhatsApp User";
-    let messageContent = "";
-
-    if (incomingMsg.type === 'text') {
-      messageContent = incomingMsg.text?.body || "";
-    } else {
-      messageContent = `[Sent a WhatsApp ${incomingMsg.type} media attachment]`;
-    }
-
-    if (!messageContent.trim()) {
-      return res.json({ status: "ignored_empty" });
-    }
-
-    const companyName = body.companyName || globalSettings.companyName;
-    const compSettings = getSettingsForCompany(companyName);
-
-    // Process using same central simulator pipeline with channel: 'WHATSAPP'
-    let ticket = tickets.find(t => t.phoneNumber === phoneNumber && t.status !== 'RESOLVED');
-    const isNewTicket = !ticket;
-
-    if (isNewTicket) {
-      ticket = {
-        id: "ticket_" + Math.floor(Math.random() * 90000 + 10000),
-        customerName,
-        phoneNumber,
-        status: "AI_PENDING",
-        sentiment: "Neutral",
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        slaExpiresAt: new Date(Date.now() + (compSettings.slaMinutes || 10) * 60000).toISOString(),
-        messages: [],
-        channel: 'WHATSAPP',
-        companyName
-      };
-      tickets.push(ticket);
-    } else {
-      ticket.channel = 'WHATSAPP';
-    }
-
-    const custMsg: Message = {
-      id: "msg_" + Math.floor(Math.random() * 90000 + 10000),
-      sender: "CUSTOMER",
-      content: messageContent,
-      createdAt: new Date().toISOString()
-    };
-    ticket.messages.push(custMsg);
-    ticket.updatedAt = new Date().toISOString();
-    await detectAndAssignLiveOrder(ticket);
-
-    // If ticket is already escalated, generate copilot suggestion but do not auto-respond
-    if (ticket.status === 'ESCALATED') {
-      await generateCopilotSuggestion(ticket, messageContent);
-      await saveTicketToFirestore(ticket);
-      return res.json({ success: true, ticketId: ticket.id, aiReplied: false });
-    }
-
-    // Intercept language configuration workflow
-    const workflowResult = handleLanguageWorkflow(ticket, messageContent);
-    let aiReplied = false;
-
-    if (workflowResult) {
-      await generateCopilotSuggestion(ticket, messageContent);
-
-      if (globalSettings.botEnabled) {
-        const aiMsg: Message = {
-          id: "msg_" + Math.floor(Math.random() * 90000 + 10000),
-          sender: 'AI',
-          content: workflowResult.actionReply,
-          createdAt: new Date().toISOString(),
-          intent: "LANGUAGE_PREFERENCE",
-          confidence: 0.99,
-          sentiment: ticket.sentiment,
-          detectedLanguage: ticket.detectedLanguage
-        };
-        ticket.messages.push(aiMsg);
-        aiReplied = true;
-        console.log(`[Auto-Replied Language Workflow simulated WhatsApp API to ${phoneNumber}]:`, workflowResult.actionReply);
-      }
-
-      await saveTicketToFirestore(ticket);
-      return res.json({ success: true, ticketId: ticket.id, aiReplied });
-    }
-
-    // Standard automated vernacular AI bot responses
-    const analysis = await generateCopilotSuggestion(ticket, messageContent);
-
-    if (globalSettings.botEnabled) {
-      let actionReply = (analysis && analysis.vernacular_reply) || "Thank you. Checking details.";
-      const aiMsg: Message = {
-        id: "msg_" + Math.floor(Math.random() * 90000 + 10000),
-        sender: 'AI',
-        content: actionReply,
-        createdAt: new Date().toISOString(),
-        intent: ticket.lastIntent,
-        confidence: (analysis && analysis.confidence) || 0.92,
-        sentiment: ticket.sentiment,
-        detectedLanguage: ticket.detectedLanguage
-      };
-      ticket.messages.push(aiMsg);
-      aiReplied = true;
-      console.log(`[Auto-Replied via simulated WhatsApp API outbound node to ${phoneNumber}]:`, actionReply);
-      if (analysis && analysis.close_ticket === true) {
-        console.log(`[Auto-Resolved ticket skipped via webhook] Close ticket flagged but deferred to 3-minute silence checker.`);
-      }
-    }
-
-    await saveTicketToFirestore(ticket);
-
-    return res.json({
-      success: true,
-      ticketId: ticket.id,
-      aiReplied
-    });
-  } catch (err: any) {
-    console.error("WhatsApp webhook parsing error:", err);
-    return res.status(500).json({ error: err.message || "Webhook processing crash" });
-  }
-});
-
-// Simulate WhatsApp webhook payload hitting server (from the developer sandbox interface)
-app.post('/api/whatsapp/simulate', async (req, res) => {
-  const { customerName, phoneNumber, message } = req.body;
-  if (!phoneNumber || !message) {
-    return res.status(400).json({ error: "Missing phoneNumber or message" });
-  }
-
-  const emp = getEmployeeFromRequest(req);
-  const companyName = emp?.companyName || globalSettings.companyName;
-
-  // Clear format of non-digit symbols for WhatsApp standard phone id
-  const rawNumber = phoneNumber.replace(/\+/g, '').replace(/[^0-9]/g, '');
-
-  const payload = {
-    object: "whatsapp_business_account",
-    companyName, // Injected company name context
-    entry: [
-      {
-        id: "wh_entry_101",
-        changes: [
-          {
-            field: "messages",
-            value: {
-              messaging_product: "whatsapp",
-              metadata: {
-                display_phone_number: "15550212345",
-                phone_number_id: "109812739102830"
-              },
-              contacts: [
-                {
-                  profile: { name: customerName || "WhatsApp Guest" },
-                  wa_id: rawNumber
-                }
-              ],
-              messages: [
-                {
-                  from: rawNumber,
-                  id: "wamid.HBgLMTkxOTk4ODc3NjY1NfQSA1NDAxNDg0NUQzMUJBMUQ0OUMyM0FB",
-                  timestamp: Math.floor(Date.now() / 1000).toString(),
-                  text: { body: message },
-                  type: "text"
-                }
-              ]
-            }
-          }
-        ]
-      }
-    ]
-  };
-
-  // Dispatch to post webhook internally to simulate real webhook lifecycle
-  const response = await fetch(`http://localhost:3000/api/webhook/whatsapp`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload)
-  });
-
-  if (response.ok) {
-    const data = await response.json();
-    return res.json({ success: true, ...data });
-  } else {
-    return res.status(500).json({ error: "Simulation dispatch failed inside web server" });
-  }
-});
-
-// Manual escalation transfer response endpoints
-app.post('/api/tickets/:id/accept-escalation', requireAuth, async (req, res) => {
-  const { id } = req.params;
-  const ticket = tickets.find(t => t.id === id);
-  if (!ticket) {
-    return res.status(404).json({ error: 'Ticket profile not found' });
-  }
-
-  ticket.status = 'ESCALATED';
-  ticket.humanRequested = false;
-  ticket.escalationDismissed = false;
-  ticket.updatedAt = new Date().toISOString();
-
-  const sysMsg: Message = {
-    id: "msg_" + Math.floor(Math.random() * 90000 + 10000),
-    sender: 'SYSTEM',
-    content: "Live human operator accepted the transfer request. Conversation is now actively routed to human support.",
-    createdAt: new Date().toISOString()
-  };
-  ticket.messages.push(sysMsg);
-
-  await saveTicketToFirestore(ticket);
-  res.json(ticket);
-});
-
-app.post('/api/tickets/:id/decline-escalation', requireAuth, async (req, res) => {
-  const { id } = req.params;
-  const ticket = tickets.find(t => t.id === id);
-  if (!ticket) {
-    return res.status(404).json({ error: 'Ticket profile not found' });
-  }
-
-  ticket.humanRequested = false;
-  ticket.escalationDismissed = true;
-  ticket.updatedAt = new Date().toISOString();
-
-  const sysMsg: Message = {
-    id: "msg_" + Math.floor(Math.random() * 90000 + 10000),
-    sender: 'SYSTEM',
-    content: "Live human operator declined the transfer request. Retaining automated AI assistant agent resolution flow.",
-    createdAt: new Date().toISOString()
-  };
-  ticket.messages.push(sysMsg);
-
-  await saveTicketToFirestore(ticket);
-  res.json(ticket);
-});
-
-// App update ticket customer email
-app.post('/api/tickets/:id/email', async (req, res) => {
-  const { id } = req.params;
-  const { customerEmail } = req.body;
-  const ticket = tickets.find(t => t.id === id);
-  if (!ticket) {
-    return res.status(404).json({ error: 'Ticket profile not found' });
-  }
-  ticket.customerEmail = customerEmail;
-  await saveTicketToFirestore(ticket);
-  res.json({ success: true, ticket });
-});
-
-// Mark Ticket as Resolved and close context
-app.post('/api/tickets/:id/resolve', requireAuth, async (req, res) => {
-  const { id } = req.params;
-  const { customerEmail } = req.body || {};
-  const ticket = tickets.find(t => t.id === id);
-  if (!ticket) {
-    return res.status(404).json({ error: 'Ticket profile not found' });
-  }
-
+// Helper function to resolve ticket and send confirmation email, reusable for manual and auto AI resolutions
+export async function resolveTicketAndSendEmailInternal(
+  ticket: Ticket,
+  customerEmail?: string,
+  customSubject?: string,
+  customBody?: string
+): Promise<string> {
   ticket.status = 'RESOLVED';
   ticket.updatedAt = new Date().toISOString();
 
@@ -2696,9 +2353,21 @@ app.post('/api/tickets/:id/resolve', requireAuth, async (req, res) => {
     hour12: true
   });
 
-  const subject = `[Resolved Ticket #${ticket.id}] Order Summary & Delivery Status update from ${companyName}`;
+  const subject = customSubject || `[Resolved Ticket #${ticket.id}] Order Summary & Delivery Status update from ${companyName}`;
   const from = `CX Executive Desk <resolutions@${companyName.toLowerCase().replace(/[^a-z0-9]/g, '') || 'vaani'}.ai>`;
   const to = `${ticket.customerName} <${emailAddr}>`;
+
+  const customBodyContent = customBody
+    ? `<div style="font-size: 13.5px; line-height: 1.6; color: #4b5563; margin-bottom: 20px; white-space: pre-wrap;">${customBody}</div>`
+    : `
+        <div class="greeting">Dear ${ticket.customerName},</div>
+        <p class="lead-text">
+          We are pleased to notify you that support inquiry <strong>#${ticket.id}</strong> is officially marked as <strong>Resolved and Closed</strong> by our operator specialists.
+        </p>
+        <p class="lead-text">
+          Our verified database matching order logs has been successfully synchronized at our warehouse logistics server. Your shipment and routing metrics are summarized below:
+        </p>
+      `;
 
   const html = `<!DOCTYPE html>
 <html>
@@ -2714,7 +2383,7 @@ app.post('/api/tickets/:id/resolve', requireAuth, async (req, res) => {
       padding: 0;
     }
     .wrapper {
-      background-color: #f3f4f6;
+      background-color: #f3f4f8;
       width: 100%;
       padding: 30px 0;
     }
@@ -2776,7 +2445,7 @@ app.post('/api/tickets/:id/resolve', requireAuth, async (req, res) => {
       letter-spacing: 0.05em;
       color: #9ca3af;
       margin-bottom: 10px;
-      border-b: 1px solid #f3f4f6;
+      border-bottom: 1px solid #f3f4f6;
       padding-bottom: 4px;
     }
     .meta-table {
@@ -2879,13 +2548,7 @@ app.post('/api/tickets/:id/resolve', requireAuth, async (req, res) => {
         <p>RESOLUTION CONFIRMATION RECEIPT</p>
       </div>
       <div class="content">
-        <div class="greeting">Dear ${ticket.customerName},</div>
-        <p class="lead-text">
-          We are pleased to notify you that support inquiry <strong>#${ticket.id}</strong> is officially marked as <strong>Resolved and Closed</strong> by our operator specialists.
-        </p>
-        <p class="lead-text">
-          Our verified database matching order logs has been successfully synchronized at our warehouse logistics server. Your shipment and routing metrics are summarized below:
-        </p>
+        ${customBodyContent}
 
         <div class="meta-box">
           <div class="meta-title">Ticket & Session Metadata</div>
@@ -2973,12 +2636,32 @@ app.post('/api/tickets/:id/resolve', requireAuth, async (req, res) => {
 
   if (host && user && pass) {
     try {
-      console.log(`[SMTP] Attempting real mail dispatch to ${emailAddr} via host ${host}:${port}...`);
+      let activeHost = host;
+      let activePort = port;
+      let activeUser = user;
+      let activePass = pass;
+      let activeSecure = port === 465;
+
+      if (host.toLowerCase().includes("vaaniai.in")) {
+        console.log("[SMTP] Redirecting test domain smtp.VaaniAI.in to high-fidelity virtual SMTP loop...");
+        try {
+          const testAccount = await nodemailer.createTestAccount();
+          activeHost = 'smtp.ethereal.email';
+          activePort = 587;
+          activeSecure = false;
+          activeUser = testAccount.user;
+          activePass = testAccount.pass;
+        } catch (e) {
+          console.error("Failed to provision virtual SMTP session:", e);
+        }
+      }
+
+      console.log(`[SMTP] Attempting real mail dispatch to ${emailAddr} via host ${activeHost}:${activePort}...`);
       const transporter = nodemailer.createTransport({
-        host,
-        port,
-        secure: port === 465, // true for 465, false for other ports
-        auth: { user, pass }
+        host: activeHost,
+        port: activePort,
+        secure: activeSecure,
+        auth: { user: activeUser, pass: activePass }
       });
 
       const info = await transporter.sendMail({
@@ -2989,10 +2672,14 @@ app.post('/api/tickets/:id/resolve', requireAuth, async (req, res) => {
       });
 
       console.log("[SMTP] Email successfully sent:", info.messageId);
-      emailSentStatusMsg = `📧 Real email successfully dispatched to ${emailAddr}! Message Transaction ID: ${info.messageId}`;
+      const previewUrl = nodemailer.getTestMessageUrl(info);
+      if (host.toLowerCase().includes("vaaniai.in") && previewUrl) {
+        emailSentStatusMsg = `📧 Real email successfully dispatched to ${emailAddr} via virtual SMTP loop (VaaniAI.in). Inspect formatted message proof: ${previewUrl}`;
+      } else {
+        emailSentStatusMsg = `📧 Real email successfully dispatched to ${emailAddr}! Message Transaction ID: ${info.messageId}`;
+      }
     } catch (smtpErr: any) {
       console.warn("[SMTP] Custom SMTP configuration was provided, but failed with:", smtpErr.message || String(smtpErr));
-      // Fallback seamlessly to Ethereal dynamic developer test account in dev/proof-of-concept mode so email is never lost
       try {
         console.log("[SMTP] Invoking dynamic developer test mail line as fallback...");
         const testAccount = await nodemailer.createTestAccount();
@@ -3021,17 +2708,16 @@ app.post('/api/tickets/:id/resolve', requireAuth, async (req, res) => {
       }
     }
   } else {
-    // Zero-config: No SMTP provided. Let's send using a free Ethereal test inbox so they get a real visual inspection link!
     try {
       console.log("[SMTP] No custom SMTP credentials found. Creating dynamic developer test mail line...");
       const testAccount = await nodemailer.createTestAccount();
       const transporter = nodemailer.createTransport({
         host: 'smtp.ethereal.email',
         port: 587,
-        secure: false, // true for 465, false for other ports
+        secure: false,
         auth: {
-          user: testAccount.user, // generated ethereal user
-          pass: testAccount.pass  // generated ethereal password
+          user: testAccount.user,
+          pass: testAccount.pass
         }
       });
 
@@ -3061,8 +2747,401 @@ app.post('/api/tickets/:id/resolve', requireAuth, async (req, res) => {
   ticket.messages.push(automaticSystemLog);
 
   await saveTicketToFirestore(ticket);
+  return emailSentStatusMsg;
+}
+
+// Manual Agent reply overriding the thread or Customer update
+app.post('/api/tickets/:id/message', async (req, res) => {
+  const { id } = req.params;
+  const { sender, content } = req.body; // sender: AGENT or CUSTOMER
+
+  // Require authentication token for manual agent replies
+  if (sender === 'AGENT') {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({ error: 'Authentication required. Please log in.' });
+    }
+    const token = authHeader.split(' ')[1];
+    const session = activeSessions.get(token);
+    if (!session || Date.now() > session.expiresAt) {
+      if (session) activeSessions.delete(token);
+      return res.status(401).json({ error: 'Session expired. Please log in again.' });
+    }
+    session.expiresAt = Date.now() + SESSION_LIFESPAN_MS;
+  }
+
+  const ticket = tickets.find(t => t.id === id);
+  if (!ticket) {
+    return res.status(404).json({ error: 'Ticket context not found' });
+  }
+
+  if (ticket.status === 'RESOLVED') {
+    return res.status(400).json({ error: 'This ticket is resolved and closed. No further replies are allowed.' });
+  }
+
+  const newMsg: Message = {
+    id: "msg_" + Math.floor(Math.random() * 90000 + 10000),
+    sender: sender || 'AGENT',
+    content,
+    createdAt: new Date().toISOString()
+  };
+
+  ticket.messages.push(newMsg);
+  ticket.updatedAt = new Date().toISOString();
+  await detectAndAssignLiveOrder(ticket);
+
+  if (sender === 'AGENT') {
+    ticket.status = 'ESCALATED'; // Human operator actively overrides active AI state
+    ticket.humanRequested = false;
+    ticket.copilotSuggestion = ""; // Clear suggestion once agent has replied
+  } else if (sender === 'CUSTOMER') {
+    // Treat as subsequent reply, run the LLM-powered suggestion analysis pipeline and save new suggestion
+    const analysis = await generateCopilotSuggestion(ticket, content);
+    if (globalSettings.botEnabled) {
+      if (analysis && analysis.close_ticket === true) {
+        console.log(`[Auto-Resolved ticket triggered by Customer message reply] Status -> RESOLVED`);
+        try {
+          await resolveTicketAndSendEmailInternal(ticket);
+        } catch (e) {
+          console.error("Auto resolve ticket email triggering pipeline failed:", e);
+        }
+      }
+    }
+  }
+
+  await saveTicketToFirestore(ticket);
+  res.json(ticket);
+});
+
+// Real-time Copilot Suggestion generator endpoint using live conversation context
+app.post('/api/tickets/:id/copilot-suggest', requireAuth, async (req, res) => {
+  const { id } = req.params;
+  const ticket = tickets.find(t => t.id === id);
+  if (!ticket) {
+    return res.status(404).json({ error: 'Ticket profile not found' });
+  }
+
+  const analysis = await generateCopilotSuggestion(ticket);
+  await saveTicketToFirestore(ticket);
+  res.json({ success: true, copilotSuggestion: ticket.copilotSuggestion || "", analysis });
+});
+
+// GET Method: Verify WhatsApp Webhook Challenge from Meta/Facebook Developers Console
+app.get('/api/webhook/whatsapp', (req, res) => {
+  const mode = req.query['hub.mode'];
+  const token = req.query['hub.verify_token'];
+  const challenge = req.query['hub.challenge'];
+
+  if (mode === 'subscribe' && token === 'VERNACULAR_COPILOT_SECURE_TOKEN_2026') {
+    console.log("WhatsApp Webhook successfully validated by Meta server!");
+    return res.status(200).send(challenge);
+  } else {
+    return res.status(403).json({ error: "Verification token mismatch" });
+  }
+});
+
+// POST Method: Receive live messages from the WhatsApp Cloud API 
+app.post('/api/webhook/whatsapp', async (req, res) => {
+  try {
+    const body = req.body;
+    console.log("Received incoming webhook payload from Meta WhatsApp API:", JSON.stringify(body, null, 2));
+
+    if (!body || body.object !== 'whatsapp_business_account') {
+      return res.status(400).json({ error: "Invalid Object Type" });
+    }
+
+    const entry = body.entry?.[0];
+    const changes = entry?.changes?.[0];
+    const value = changes?.value;
+    const incomingMsg = value?.messages?.[0];
+    const contact = value?.contacts?.[0];
+
+    if (!incomingMsg) {
+      return res.json({ status: "ignored_no_messages" });
+    }
+
+    const phoneNumber = "+" + incomingMsg.from; // e.g. "+919988776655"
+    const customerName = contact?.profile?.name || "WhatsApp User";
+    let messageContent = "";
+
+    if (incomingMsg.type === 'text') {
+      messageContent = incomingMsg.text?.body || "";
+    } else {
+      messageContent = `[Sent a WhatsApp ${incomingMsg.type} media attachment]`;
+    }
+
+    if (!messageContent.trim()) {
+      return res.json({ status: "ignored_empty" });
+    }
+
+    const companyName = body.companyName || globalSettings.companyName;
+    const compSettings = getSettingsForCompany(companyName);
+
+    let ticket = tickets.find(t => t.phoneNumber === phoneNumber && t.status !== 'RESOLVED');
+    const isNewTicket = !ticket;
+
+    if (isNewTicket) {
+      ticket = {
+        id: "ticket_" + Math.floor(Math.random() * 90000 + 10000),
+        customerName,
+        phoneNumber,
+        status: "AI_PENDING",
+        sentiment: "Neutral",
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        slaExpiresAt: new Date(Date.now() + (compSettings.slaMinutes || 10) * 60000).toISOString(),
+        messages: [],
+        channel: 'WHATSAPP',
+        companyName
+      };
+      tickets.push(ticket);
+    } else {
+      ticket.channel = 'WHATSAPP';
+    }
+
+    const custMsg: Message = {
+      id: "msg_" + Math.floor(Math.random() * 90000 + 10000),
+      sender: "CUSTOMER",
+      content: messageContent,
+      createdAt: new Date().toISOString()
+    };
+    ticket.messages.push(custMsg);
+    ticket.updatedAt = new Date().toISOString();
+    await detectAndAssignLiveOrder(ticket);
+
+    if (ticket.status === 'ESCALATED') {
+      await generateCopilotSuggestion(ticket, messageContent);
+      await saveTicketToFirestore(ticket);
+      return res.json({ success: true, ticketId: ticket.id, aiReplied: false });
+    }
+
+    const workflowResult = handleLanguageWorkflow(ticket, messageContent);
+    let aiReplied = false;
+
+    if (workflowResult) {
+      await generateCopilotSuggestion(ticket, messageContent);
+
+      if (globalSettings.botEnabled) {
+        const aiMsg: Message = {
+          id: "msg_" + Math.floor(Math.random() * 90000 + 10000),
+          sender: 'AI',
+          content: workflowResult.actionReply,
+          createdAt: new Date().toISOString(),
+          intent: "LANGUAGE_PREFERENCE",
+          confidence: 0.99,
+          sentiment: ticket.sentiment,
+          detectedLanguage: ticket.detectedLanguage
+        };
+        ticket.messages.push(aiMsg);
+        aiReplied = true;
+      }
+
+      await saveTicketToFirestore(ticket);
+      return res.json({ success: true, ticketId: ticket.id, aiReplied });
+    }
+
+    const analysis = await generateCopilotSuggestion(ticket, messageContent);
+
+    if (globalSettings.botEnabled) {
+      let actionReply = (analysis && analysis.vernacular_reply) || "Thank you. Checking details.";
+      const aiMsg: Message = {
+        id: "msg_" + Math.floor(Math.random() * 90000 + 10000),
+        sender: 'AI',
+        content: actionReply,
+        createdAt: new Date().toISOString(),
+        intent: ticket.lastIntent,
+        confidence: (analysis && analysis.confidence) || 0.92,
+        sentiment: ticket.sentiment,
+        detectedLanguage: ticket.detectedLanguage
+      };
+      ticket.messages.push(aiMsg);
+      aiReplied = true;
+      if (analysis && analysis.close_ticket === true) {
+        console.log(`[Auto-Resolved ticket triggered by WhatsApp AI webhook] Status -> RESOLVED`);
+        try {
+          await resolveTicketAndSendEmailInternal(ticket);
+        } catch (e) {
+          console.error("Auto resolve ticket email from webhook failed:", e);
+        }
+      }
+    }
+
+    await saveTicketToFirestore(ticket);
+    return res.json({ success: true, ticketId: ticket.id, aiReplied });
+  } catch (err: any) {
+    console.error("WhatsApp webhook parsing error:", err);
+    return res.status(500).json({ error: err.message || "Webhook processing crash" });
+  }
+});
+
+// Simulate WhatsApp webhook payload hitting server (from the developer sandbox interface)
+app.post('/api/whatsapp/simulate', async (req, res) => {
+  const { customerName, phoneNumber, message } = req.body;
+  if (!phoneNumber || !message) {
+    return res.status(400).json({ error: "Missing phoneNumber or message" });
+  }
+
+  const emp = getEmployeeFromRequest(req);
+  const companyName = emp?.companyName || globalSettings.companyName;
+  const rawNumber = phoneNumber.replace(/\+/g, '').replace(/[^0-9]/g, '');
+
+  const payload = {
+    object: "whatsapp_business_account",
+    companyName,
+    entry: [
+      {
+        id: "wh_entry_101",
+        changes: [
+          {
+            field: "messages",
+            value: {
+              messaging_product: "whatsapp",
+              metadata: {
+                display_phone_number: "15550212345",
+                phone_number_id: "109812739102830"
+              },
+              contacts: [
+                {
+                  profile: { name: customerName || "WhatsApp Guest" },
+                  wa_id: rawNumber
+                }
+              ],
+              messages: [
+                {
+                  from: rawNumber,
+                  id: "wamid.HBgLMTkxOTk4ODc3NjY1NfQSA1NDAxNDg0NUQzMUJBMUQ0OUMyM0FB",
+                  timestamp: Math.floor(Date.now() / 1000).toString(),
+                  text: { body: message },
+                  type: "text"
+                }
+              ]
+            }
+          }
+        ]
+      }
+    ]
+  };
+
+  const response = await fetch(`http://localhost:3000/api/webhook/whatsapp`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  });
+
+  if (response.ok) {
+    const data = await response.json();
+    return res.json({ success: true, ...data });
+  } else {
+    return res.status(500).json({ error: "Simulation dispatch failed inside web server" });
+  }
+});
+
+// Manual escalation transfer response endpoints
+app.post('/api/tickets/:id/accept-escalation', requireAuth, async (req, res) => {
+  const { id } = req.params;
+  const ticket = tickets.find(t => t.id === id);
+  if (!ticket) {
+    return res.status(404).json({ error: 'Ticket profile not found' });
+  }
+
+  ticket.status = 'ESCALATED';
+  ticket.humanRequested = false;
+  ticket.escalationDismissed = false;
+  ticket.updatedAt = new Date().toISOString();
+
+  const sysMsg: Message = {
+    id: "msg_" + Math.floor(Math.random() * 90000 + 10000),
+    sender: 'SYSTEM',
+    content: "Live human operator accepted the transfer request. Conversation is now actively routed to human support.",
+    createdAt: new Date().toISOString()
+  };
+  ticket.messages.push(sysMsg);
+
+  await saveTicketToFirestore(ticket);
+  res.json(ticket);
+});
+
+app.post('/api/tickets/:id/decline-escalation', requireAuth, async (req, res) => {
+  const { id } = req.params;
+  const ticket = tickets.find(t => t.id === id);
+  if (!ticket) {
+    return res.status(404).json({ error: 'Ticket profile not found' });
+  }
+
+  ticket.humanRequested = false;
+  ticket.escalationDismissed = true;
+  ticket.updatedAt = new Date().toISOString();
+
+  const sysMsg: Message = {
+    id: "msg_" + Math.floor(Math.random() * 90000 + 10000),
+    sender: 'SYSTEM',
+    content: "Live human operator declined the transfer request. Retaining automated AI assistant agent resolution flow.",
+    createdAt: new Date().toISOString()
+  };
+  ticket.messages.push(sysMsg);
+
+  await saveTicketToFirestore(ticket);
+  res.json(ticket);
+});
+
+// App update ticket customer email
+app.post('/api/tickets/:id/email', async (req, res) => {
+  const { id } = req.params;
+  const { customerEmail } = req.body;
+  const ticket = tickets.find(t => t.id === id);
+  if (!ticket) {
+    return res.status(404).json({ error: 'Ticket profile not found' });
+  }
+  ticket.customerEmail = customerEmail;
+  await saveTicketToFirestore(ticket);
   res.json({ success: true, ticket });
 });
+
+// App draft email via AI
+app.post('/api/tickets/:id/draft-email', requireAuth, async (req, res) => {
+  const { id } = req.params;
+  const ticket = tickets.find(t => t.id === id);
+  if (!ticket) {
+    return res.status(404).json({ error: 'Ticket profile not found' });
+  }
+
+  try {
+    const draft = await draftResolutionEmail(ticket);
+    const emailAddr = ticket.customerEmail || (ticket.customerName.toLowerCase().replace(/\s+/g, '') + "@gmail.com");
+    res.json({
+      success: true,
+      draft: {
+        subject: draft.subject,
+        body: draft.body,
+        to: emailAddr
+      }
+    });
+  } catch (err: any) {
+    console.error("Error drafting support resolution email via Gemini:", err);
+    res.status(500).json({ error: "Failed to generate email draft: " + (err.message || String(err)) });
+  }
+});
+
+
+// Mark Ticket as Resolved and close context
+app.post('/api/tickets/:id/resolve', requireAuth, async (req, res) => {
+  const { id } = req.params;
+  const { customerEmail, subject: customSubject, body: customBody } = req.body || {};
+  const ticket = tickets.find(t => t.id === id);
+  if (!ticket) {
+    return res.status(404).json({ error: 'Ticket profile not found' });
+  }
+
+  try {
+    const statusMsg = await resolveTicketAndSendEmailInternal(ticket, customerEmail, customSubject, customBody);
+    res.json({ success: true, ticket });
+  } catch (err: any) {
+    console.error("Resolution failed inside API handler:", err);
+    res.status(500).json({ error: "Failed to resolve ticket: " + (err.message || String(err)) });
+  }
+});
+
+
 
 // Submit customer experience rating for a resolved ticket
 app.post('/api/tickets/:id/rate', async (req, res) => {

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   Search, 
@@ -45,7 +45,7 @@ interface InboxTabProps {
   setSimName: (name: string) => void;
   setSimPhone: (phone: string) => void;
   setSimMessage: (msg: string) => void;
-  handleResolveTicket: (id: string, email: string) => void;
+  handleResolveTicket: (id: string, email: string, subject?: string, body?: string) => void;
   handleReleaseTicket: (id: string) => void;
   handleClaimTicket: (id: string) => void;
   isOrderPanelExpanded: boolean;
@@ -165,6 +165,78 @@ export function InboxTab({
   handleSendSimulationMessage,
   setRatingSubmitting
 }: InboxTabProps) {
+  const [isResolveModalOpen, setIsResolveModalOpen] = useState(false);
+  const [resolveEmailTo, setResolveEmailTo] = useState('');
+  const [resolveEmailSubject, setResolveEmailSubject] = useState('');
+  const [resolveEmailBody, setResolveEmailBody] = useState('');
+  const [isDraftingEmail, setIsDraftingEmail] = useState(false);
+  const [draftError, setDraftError] = useState<string | null>(null);
+
+  const triggerResolveFlow = async () => {
+    if (!activeTicket) return;
+    
+    setIsResolveModalOpen(true);
+    setIsDraftingEmail(true);
+    setDraftError(null);
+    
+    const recipient = editCustEmail || activeTicket.customerEmail || (activeTicket.customerName.toLowerCase().replace(/\s+/g, '') + "@gmail.com");
+    setResolveEmailTo(recipient);
+    setResolveEmailSubject(`[Resolved Ticket #${activeTicket.id}] Summary Generating...`);
+    setResolveEmailBody("Creating highly formal resolution summary based on your conversation logs with Gemini AI, please stand by...");
+    
+    try {
+      const token = localStorage.getItem('vaani_logged_token');
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+
+      const res = await fetch(`/api/tickets/${activeTicket.id}/draft-email`, {
+        method: "POST",
+        headers
+      });
+      
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && data.draft) {
+          setResolveEmailTo(data.draft.to || recipient);
+          setResolveEmailSubject(data.draft.subject || `[Resolved Ticket #${activeTicket.id}] Final Resolution Summary`);
+          setResolveEmailBody(data.draft.body || '');
+        } else {
+          throw new Error("Could not parse email draft payload.");
+        }
+      } else {
+        const errText = await res.text();
+        throw new Error(errText || "AI Draft generator returned an error status.");
+      }
+    } catch (err: any) {
+      console.warn("AI Email Draft failed, using formal template fallback:", err);
+      setDraftError("AI draft generation offline or failed. Standard template is loaded for manual verification.");
+      
+      const resolvedDateStr = new Date().toLocaleDateString('en-US', {
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+      });
+      
+      setResolveEmailSubject(`[Resolved Ticket #${activeTicket.id}] Final Support Resolution - ${activeTicket.companyName || 'VaaniAI Solutions'}`);
+      setResolveEmailBody(`Dear ${activeTicket.customerName},
+
+We are writing to formally confirm that support ticket #${activeTicket.id} has been marked as resolved as of today, ${resolvedDateStr}.
+
+Any linked order deliveries and payment details have been fully synchronized with our logistics backend. If you require any further assistance, please contact our support branch at your convenience.
+
+Thank you for choosing us.
+
+Sincerely,
+Resolution Executive Desk
+${activeTicket.companyName || 'VaaniAI Solutions'}`);
+    } finally {
+      setIsDraftingEmail(false);
+    }
+  };
+
   return (
     <motion.div
       key="inbox"
@@ -448,7 +520,7 @@ export function InboxTab({
                 {activeTicket.status !== 'RESOLVED' && (
                   <button
                     id="btn_resolve_ticket"
-                    onClick={() => handleResolveTicket(activeTicket.id, editCustEmail)}
+                    onClick={triggerResolveFlow}
                     className="px-3 py-1.5 text-xs font-semibold bg-emerald-500/10 hover:bg-emerald-500/25 text-emerald-400 border border-emerald-500/30 rounded-lg transition duration-150 flex items-center gap-1.5 cursor-pointer select-none"
                     title="Resolve Ticket: Marks this ticket as resolved and closes the customer session."
                   >
@@ -1473,6 +1545,117 @@ export function InboxTab({
               </p>
             )}
           </div>
+        </div>
+      )}
+
+      {/* Resolve Confirmation & Email Formatting Modal */}
+      {isResolveModalOpen && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.95 }}
+            className="bg-[#0b0c10] border border-white/[0.08] rounded-xl w-full max-w-2xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh]"
+          >
+            {/* Modal Header */}
+            <div className="px-6 py-4 border-b border-white/[0.05] bg-[#0f1118] flex items-center justify-between shrink-0">
+              <div className="flex items-center gap-2">
+                <Sparkles size={16} className="text-orange-500 animate-pulse shrink-0" />
+                <h3 className="text-xs font-semibold tracking-wide text-white uppercase font-mono">Format & Send Formal Support Email</h3>
+              </div>
+              <button 
+                onClick={() => setIsResolveModalOpen(false)}
+                className="text-gray-400 hover:text-white text-xs px-2 py-1 rounded hover:bg-white/[0.05] transition"
+              >
+                ✕ Cancel
+              </button>
+            </div>
+
+            {/* Modal Content */}
+            <div className="p-6 space-y-4 flex-1 overflow-y-auto">
+              {draftError && (
+                <div className="p-3 bg-red-500/10 border border-red-500/20 rounded text-red-400 text-xs font-mono">
+                  ⚠️ {draftError}
+                </div>
+              )}
+
+              {/* Recipient Address */}
+              <div className="space-y-1.5 text-left">
+                <label className="text-[10px] text-gray-400 font-mono tracking-wider uppercase font-semibold">Registered Customer Email-ID</label>
+                <input 
+                  type="email" 
+                  value={resolveEmailTo}
+                  onChange={(e) => setResolveEmailTo(e.target.value)}
+                  placeholder="customer@email.com"
+                  disabled={isDraftingEmail}
+                  className="w-full bg-[#12141c] text-white border border-white/[0.08] focus:border-orange-500 rounded px-3 py-2 text-xs font-mono focus:outline-none transition"
+                />
+              </div>
+
+              {/* Email Subject Line */}
+              <div className="space-y-1.5 text-left">
+                <label className="text-[10px] text-gray-400 font-mono tracking-wider uppercase font-semibold">Email Subject Line</label>
+                <input 
+                  type="text" 
+                  value={resolveEmailSubject}
+                  onChange={(e) => setResolveEmailSubject(e.target.value)}
+                  placeholder="Ticket resolution summary"
+                  disabled={isDraftingEmail}
+                  className="w-full bg-[#12141c] text-white border border-white/[0.08] focus:border-orange-500 rounded px-3 py-2 text-xs font-medium focus:outline-none transition"
+                />
+              </div>
+
+              {/* Email Body Prose */}
+              <div className="space-y-1.5 text-left">
+                <div className="flex justify-between items-center">
+                  <label className="text-[10px] text-gray-400 font-mono tracking-wider uppercase font-semibold">Email Body Content (Formal Prose)</label>
+                  {isDraftingEmail && (
+                    <span className="text-[9px] text-orange-400 font-mono animate-pulse">AI is drafting...</span>
+                  )}
+                </div>
+                <textarea 
+                  value={resolveEmailBody}
+                  onChange={(e) => setResolveEmailBody(e.target.value)}
+                  rows={10}
+                  disabled={isDraftingEmail}
+                  placeholder="Support agent email summary prose..."
+                  className="w-full bg-[#12141c] text-white border border-white/[0.08] focus:border-orange-500 rounded p-3 text-xs leading-relaxed focus:outline-none font-mono transition resize-none"
+                />
+              </div>
+            </div>
+
+            {/* Modal Actions */}
+            <div className="px-6 py-4 border-t border-white/[0.05] bg-[#0c0d12] flex items-center justify-between shrink-0">
+              <button
+                onClick={triggerResolveFlow}
+                disabled={isDraftingEmail}
+                className="px-3 py-1.5 text-xs text-orange-400 hover:text-white bg-orange-500/10 hover:bg-orange-500/20 rounded border border-orange-500/30 transition disabled:opacity-40 flex items-center gap-1.5 cursor-pointer selection:none"
+              >
+                <RefreshCw size={12} className={isDraftingEmail ? 'animate-spin' : ''} />
+                Regenerate AI Draft
+              </button>
+
+              <div className="flex items-center gap-2">
+                <button 
+                  onClick={() => setIsResolveModalOpen(false)}
+                  className="px-4 py-2 text-xs font-semibold text-gray-400 hover:text-white bg-white/[0.02] hover:bg-white/[0.05] rounded-lg border border-white/[0.05] transition"
+                >
+                  Cancel
+                </button>
+                <button 
+                  onClick={() => {
+                    if (!activeTicket) return;
+                    handleResolveTicket(activeTicket.id, resolveEmailTo, resolveEmailSubject, resolveEmailBody);
+                    setIsResolveModalOpen(false);
+                  }}
+                  disabled={isDraftingEmail || !resolveEmailTo.trim() || !resolveEmailSubject.trim() || !resolveEmailBody.trim()}
+                  className="px-4 py-2 text-xs font-semibold bg-emerald-500 text-black hover:bg-emerald-400 rounded-lg shadow-lg shadow-emerald-500/10 transition disabled:opacity-40 cursor-pointer"
+                >
+                  Send Email & Resolve Ticket
+                </button>
+              </div>
+            </div>
+          </motion.div>
         </div>
       )}
     </motion.div>
